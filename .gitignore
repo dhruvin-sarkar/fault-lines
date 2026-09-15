@@ -1,0 +1,32 @@
+# Local working files
+CLAUDE.md
+claude.md
+PROGRESS.md
+*BUILD_MANUAL*
+.env
+.remember/
+
+# Data cache
+data/*
+!data/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.ipynb_checkpoints/
+
+# Node
+node_modules/
+web/dist/
+web/.vite/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

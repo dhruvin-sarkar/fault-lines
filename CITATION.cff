@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below, and cite the male CNS connectome paper it analyses."
+title: "Fault Lines: attack tolerance and structural robustness of the complete Drosophila male CNS connectome"
+authors:
+  - family-names: Sarkar
+    given-names: Dhruvin
+date-released: 2026-09-15
+license: MIT
+repository-code: "https://github.com/dhruvin-sarkar/fault-lines"
+references:
+  - type: article
+    title: "Sexual dimorphism in the complete Drosophila male central nervous system connectome"
+    authors:
+      - family-names: Berg
+        given-names: Stuart
+      - name: "et al."
+    journal: Cell
+    year: 2026
+    volume: 189
+    issue: 18
+    start: 5504
+    end: 5526
+    doi: 10.1016/j.cell.2026.08.015
