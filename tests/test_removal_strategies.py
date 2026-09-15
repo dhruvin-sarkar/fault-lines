@@ -85,6 +85,20 @@ def test_percolation_records_curves_and_never_removes_a_node_twice():
         assert len(run["avalanche"]) == len(run["removed"])
 
 
+def test_continuing_past_the_limit_keeps_the_same_prefix():
+    rng = np.random.default_rng(4)
+    graph = ig.Graph.Erdos_Renyi(n=150, m=900, directed=True, loops=False)
+    graph.vs["name"] = [f"v{i}" for i in range(graph.vcount())]
+    graph.es["weight"] = rng.integers(1, 50, graph.ecount()).tolist()
+    sources, targets = [f"v{i}" for i in range(15)], [f"v{i}" for i in range(135, 150)]
+    short = percolate(graph, "random", sources, targets, seed=9, max_fraction=0.2)
+    long = percolate(graph, "random", sources, targets, seed=9, max_fraction=0.2, continue_until_flow_below=1)
+    k = len(short["removed"])
+    assert long["removed"][:k] == short["removed"]
+    assert np.array_equal(long["flow"][: k + 1], short["flow"])
+    assert long["flow"][-1] < 1 and long["fraction_removed"][-1] > short["fraction_removed"][-1]
+
+
 def test_random_strategy_is_reproducible_for_a_seed():
     graph = cascade_graph()
     a = percolate(graph, "random", [], [], seed=11)["removed"]

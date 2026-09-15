@@ -71,8 +71,13 @@ def percolate(
     seed: int,
     max_fraction: float = MAX_FRACTION,
     batch_fraction: float = BATCH_FRACTION,
+    continue_until_flow_below: float | None = None,
 ) -> dict:
     """Remove vertices in adaptive batches and track sensory-to-motor connectivity after each batch.
+
+    Removal stops once ``max_fraction`` of the vertices are gone. With ``continue_until_flow_below`` set,
+    it carries on past that point (same batch rule, same random stream) until flow falls below the given
+    value, so the first ``max_fraction`` of the run is identical either way.
 
     Returns:
         ``fraction_removed``, ``flow`` and ``reachable_pairs`` (one entry for the intact graph, then one per
@@ -85,7 +90,9 @@ def percolate(
     fraction, flow, pairs = [0.0], [flow_capacity(working, sources, targets)], [reachable_pairs(working, sources, targets)]
     cut = unreachable_from(working, sources)
     removed_batches, avalanche, removed = [], [], 0
-    for size in removal_schedule(n, batch_fraction, max_fraction):
+    for size in removal_schedule(n, batch_fraction, max_fraction=1.0):
+        if fraction[-1] >= max_fraction and (continue_until_flow_below is None or flow[-1] < continue_until_flow_below):
+            break
         chosen = select_top(strategy_scores(working, strategy, sources, targets, rng), size, rng)
         removed_batches.append([working.vs[int(i)]["name"] for i in chosen])
         working.delete_vertices(chosen.tolist())
