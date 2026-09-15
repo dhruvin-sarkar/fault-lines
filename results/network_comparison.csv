@@ -1,0 +1,16 @@
+network,removal,criterion,value,qualifier,citation,location,group
+"Male CNS cell types, weighted out-degree","targeted, adaptive weighted out-degree",sensory-to-motor flow capacity halved,0.0411,=,this study,results/critical_thresholds.json,this study
+"Male CNS cell types, weighted in-degree","targeted, adaptive weighted in-degree",sensory-to-motor flow capacity halved,0.1387,=,this study,results/critical_thresholds.json,this study
+"Male CNS cell types, betweenness","targeted, adaptive betweenness",sensory-to-motor flow capacity halved,0.0904,=,this study,results/critical_thresholds.json,this study
+"Male CNS cell types, PageRank","targeted, adaptive PageRank",sensory-to-motor flow capacity halved,0.1875,=,this study,results/critical_thresholds.json,this study
+"Male CNS cell types, sensory-motor betweenness","targeted, adaptive sensory-motor betweenness",sensory-to-motor flow capacity halved,0.0961,=,this study,results/critical_thresholds.json,this study
+"Male CNS cell types, random",random,sensory-to-motor flow capacity halved,0.2832,=,this study,results/critical_thresholds.json,this study
+"Internet, autonomous-system level (6,209 nodes)","targeted, by degree",largest cluster fragments,0.0300,≈,Albert 2000,"main text, Internet paragraph","published, targeted"
+"World Wide Web sample (325,729 pages)","targeted, by out-degree",largest cluster fragments,0.0670,=,Albert 2000,main text and Fig. 3 caption,"published, targeted"
+"Scale-free model (N = 10,000)","targeted, by degree",largest cluster fragments,0.1800,≈,Albert 2000,"main text, fragmentation paragraph","published, targeted"
+"Exponential random model (N = 10,000)","targeted, by degree",largest cluster fragments,0.2800,≈,Albert 2000,"main text, fragmentation paragraph","published, targeted"
+"North American power grid (14,099 substations)","targeted, by load",up to 60% loss of generator-to-substation connectivity,0.0400,=,Albert 2004,main text,"published, targeted"
+Human functional brain network (90 regions),"targeted, by degree",largest cluster halved,0.4000,≈,Achard 2006,Results and Discussion,"published, targeted"
+Scale-free comparison network,"targeted, by degree",largest cluster halved,0.2000,=,Achard 2006,Results,"published, targeted"
+"Human voxel-wise functional network (15,996 voxels)","targeted, recalculated centrality",first dramatic giant-component reduction,0.4000,≈,Joyce 2013,Results and Discussion,"published, targeted"
+"Scale-free network, Internet-like exponent (N > 10⁶)",random,spanning cluster vanishes,0.9900,>,Cohen 2000,abstract,"published, random"
