@@ -5,6 +5,7 @@ from collections.abc import Sequence
 
 import igraph as ig
 import numpy as np
+import pandas as pd
 
 from pipeline.connectivity_metrics import flow_capacity, present_indices, reachable_pairs, unreachable_from
 
@@ -45,6 +46,25 @@ def strategy_scores(
             return np.zeros(graph.vcount())
         return np.asarray(graph.betweenness(directed=True, sources=src, targets=tgt), dtype=float)
     raise ValueError(f"Unknown strategy {strategy!r}; expected one of {STRATEGIES}")
+
+
+def intact_scores(
+    graph: ig.Graph, sources: Sequence[str], targets: Sequence[str], include_betweenness: bool = True
+) -> pd.DataFrame:
+    """Every deterministic strategy score on the given graph, plus unweighted in/out/total degree, one row per vertex."""
+    table = pd.DataFrame(
+        {
+            "cell_type": graph.vs["name"],
+            "in_degree": graph.indegree(),
+            "out_degree": graph.outdegree(),
+            "degree": graph.degree(mode="all"),
+        }
+    )
+    for strategy in STRATEGIES:
+        if strategy == "random" or (strategy == "betweenness" and not include_betweenness):
+            continue
+        table[strategy] = strategy_scores(graph, strategy, sources, targets, None)
+    return table
 
 
 def select_top(scores: np.ndarray, k: int, rng: np.random.Generator) -> np.ndarray:
