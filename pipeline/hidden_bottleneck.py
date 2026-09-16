@@ -115,7 +115,10 @@ def main() -> None:
     (RESULTS / "hidden_bottleneck.json").write_text(
         json.dumps({"criteria": {"degree_percentile_below": LOW_PERCENTILE, "pagerank_percentile_below": LOW_PERCENTILE,
                                  "sm_betweenness_percentile_at_least": HIGH_PERCENTILE},
-                    "n_candidates": len(candidates), "example": stats}, indent=2) + "\n", encoding="utf-8")
+                    "n_candidates": len(candidates),
+                    "candidates": candidates[["cell_type", "superclass", "degree", "degree_pct", "pagerank_pct",
+                                              "sm_betweenness", "sm_betweenness_pct"]].to_dict("records"),
+                    "example": stats}, indent=2) + "\n", encoding="utf-8")
 
     def partner_list(rows: list[dict]) -> str:
         return ", ".join(f"`{r['cell_type']}` ({r['superclass']}, {r['synapses']} synapses)" for r in rows)

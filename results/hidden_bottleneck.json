@@ -5,6 +5,44 @@
     "sm_betweenness_percentile_at_least": 99.0
   },
   "n_candidates": 4,
+  "candidates": [
+    {
+      "cell_type": "ALIN7",
+      "superclass": "cb_intrinsic",
+      "degree": 34,
+      "degree_pct": 45.65994383456727,
+      "pagerank_pct": 9.841715598672453,
+      "sm_betweenness": 1881.3279974441145,
+      "sm_betweenness_pct": 99.8255467619777
+    },
+    {
+      "cell_type": "ALON3",
+      "superclass": "cb_intrinsic",
+      "degree": 29,
+      "degree_pct": 29.959152412560634,
+      "pagerank_pct": 36.06076078631606,
+      "sm_betweenness": 1558.1943939674718,
+      "sm_betweenness_pct": 99.72342779337929
+    },
+    {
+      "cell_type": "GNG354",
+      "superclass": "cb_intrinsic",
+      "degree": 32,
+      "degree_pct": 39.515785890562505,
+      "pagerank_pct": 15.526338183984342,
+      "sm_betweenness": 951.9633464163533,
+      "sm_betweenness_pct": 99.28091226278615
+    },
+    {
+      "cell_type": "ANXXX264",
+      "superclass": "ascending_neuron",
+      "degree": 34,
+      "degree_pct": 45.65994383456727,
+      "pagerank_pct": 38.843502680622926,
+      "sm_betweenness": 865.0172086476326,
+      "sm_betweenness_pct": 99.19581312228746
+    }
+  ],
   "example": {
     "cell_type": "ALIN7",
     "superclass": "cb_intrinsic",
@@ -15,7 +53,7 @@
     "degree_percentile": 45.65994383456727,
     "in_strength": 3699.0,
     "out_strength": 4753.0,
-    "pagerank": 2.890448203015118e-05,
+    "pagerank": 2.8904482030167033e-05,
     "pagerank_percentile": 9.841715598672453,
     "betweenness": 323577.8466444415,
     "sm_betweenness": 1881.3279974441145,
