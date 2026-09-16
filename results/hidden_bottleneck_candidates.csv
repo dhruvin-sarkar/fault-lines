@@ -1,0 +1,5 @@
+cell_type,in_degree,out_degree,degree,out_strength,in_strength,betweenness,pagerank,sm_betweenness,superclass,n_neurons,degree_pct,pagerank_pct,sm_betweenness_pct
+ALIN7,19,15,34,4753,3699,323578,2.89045e-05,1881.33,cb_intrinsic,2,45.6599,9.84172,99.8255
+ALON3,15,14,29,2771,10416,68780.6,4.82827e-05,1558.19,cb_intrinsic,4,29.9592,36.0608,99.7234
+GNG354,23,9,32,837,904,53695.6,3.29043e-05,951.963,cb_intrinsic,3,39.5158,15.5263,99.2809
+ANXXX264,20,14,34,1271,5532,24964.3,5.04157e-05,865.017,ascending_neuron,2,45.6599,38.8435,99.1958
