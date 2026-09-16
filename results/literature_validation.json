@@ -1,0 +1,289 @@
+{
+  "alpha": 0.05,
+  "tests": {
+    "primary": {
+      "sm_betweenness": {
+        "n_curated": 14,
+        "n_other": 11737,
+        "U": 103535.0,
+        "p_value": 0.04538707700369623,
+        "auc": 0.6300892172494796,
+        "rank_biserial": 0.2601784344989593,
+        "median_percentile": 76.77644455790997
+      },
+      "flow_drop": {
+        "n_curated": 14,
+        "n_other": 11737,
+        "U": 61754.0,
+        "p_value": 0.9701635193476288,
+        "auc": 0.37582005623242737,
+        "rank_biserial": -0.24835988753514526,
+        "median_percentile": 32.27384903412476
+      },
+      "betweenness": {
+        "n_curated": 14,
+        "n_other": 11737,
+        "U": 136653.0,
+        "p_value": 8.692466874921912e-06,
+        "auc": 0.8316374347302182,
+        "rank_biserial": 0.6632748694604365,
+        "median_percentile": 94.88979661305422
+      }
+    },
+    "with_positive_control": {
+      "sm_betweenness": {
+        "n_curated": 15,
+        "n_other": 11736,
+        "U": 104667.0,
+        "p_value": 0.10159067746117989,
+        "auc": 0.5945637355146558,
+        "rank_biserial": 0.1891274710293116,
+        "median_percentile": 75.11275636116075
+      },
+      "flow_drop": {
+        "n_curated": 15,
+        "n_other": 11736,
+        "U": 69910.5,
+        "p_value": 0.9468174872592101,
+        "auc": 0.39712849352419904,
+        "rank_biserial": -0.2057430129516019,
+        "median_percentile": 32.27384903412476
+      },
+      "betweenness": {
+        "n_curated": 15,
+        "n_other": 11736,
+        "U": 137346.0,
+        "p_value": 8.599826769118855e-05,
+        "auc": 0.7801976823449216,
+        "rank_biserial": 0.5603953646898432,
+        "median_percentile": 94.4387711684112
+      }
+    },
+    "DNp71_for_DNp09": {
+      "sm_betweenness": {
+        "n_curated": 14,
+        "n_other": 11737,
+        "U": 108648.0,
+        "p_value": 0.018045875447745267,
+        "auc": 0.6612057108776884,
+        "rank_biserial": 0.32241142175537685,
+        "median_percentile": 79.10816100757381
+      },
+      "flow_drop": {
+        "n_curated": 14,
+        "n_other": 11737,
+        "U": 61754.0,
+        "p_value": 0.9701635193476288,
+        "auc": 0.37582005623242737,
+        "rank_biserial": -0.24835988753514526,
+        "median_percentile": 32.27384903412476
+      },
+      "betweenness": {
+        "n_curated": 14,
+        "n_other": 11737,
+        "U": 138303.0,
+        "p_value": 4.796392688982672e-06,
+        "auc": 0.841678939617084,
+        "rank_biserial": 0.6833578792341679,
+        "median_percentile": 96.54071993872861
+      }
+    }
+  },
+  "curated_types": {
+    "DNp01": {
+      "published_name": "Giant Fiber",
+      "behavior": "fast looming-evoked escape takeoff",
+      "evidence": "S+N",
+      "superclass": "descending_neuron",
+      "n_neurons": 2,
+      "sm_betweenness_percentile": 78.44013275465917,
+      "flow_drop_percentile": 69.53450770147222,
+      "betweenness_percentile": 43.004850651008425,
+      "sm_betweenness": 50.94922588793923,
+      "flow_drop": 1.0,
+      "betweenness": 14804.112391757364
+    },
+    "MDN": {
+      "published_name": "moonwalker descending neurons",
+      "behavior": "backward walking",
+      "evidence": "S+N",
+      "superclass": "descending_neuron",
+      "n_neurons": 4,
+      "sm_betweenness_percentile": 75.11275636116075,
+      "flow_drop_percentile": 32.27384903412476,
+      "betweenness_percentile": 98.94902561484129,
+      "sm_betweenness": 40.12889226496187,
+      "flow_drop": 0.0,
+      "betweenness": 264105.0425452248
+    },
+    "LPLC2": {
+      "published_name": "LPLC2",
+      "behavior": "looming-evoked escape",
+      "evidence": "S+N",
+      "superclass": "visual_projection",
+      "n_neurons": 185,
+      "sm_betweenness_percentile": 92.3283124840439,
+      "flow_drop_percentile": 32.27384903412476,
+      "betweenness_percentile": 94.4387711684112,
+      "sm_betweenness": 188.7210294788264,
+      "flow_drop": 0.0,
+      "betweenness": 122694.44863876914
+    },
+    "LC4": {
+      "published_name": "LC4",
+      "behavior": "fast looming-evoked escape",
+      "evidence": "S+N",
+      "superclass": "visual_projection",
+      "n_neurons": 126,
+      "sm_betweenness_percentile": 79.77618926048847,
+      "flow_drop_percentile": 32.27384903412476,
+      "betweenness_percentile": 93.65585907582333,
+      "sm_betweenness": 56.33038005248501,
+      "flow_drop": 0.0,
+      "betweenness": 114833.65299236758
+    },
+    "DNp07": {
+      "published_name": "DNp07",
+      "behavior": "landing",
+      "evidence": "S+N",
+      "superclass": "descending_neuron",
+      "n_neurons": 2,
+      "sm_betweenness_percentile": 86.83941792187899,
+      "flow_drop_percentile": 32.27384903412476,
+      "betweenness_percentile": 95.34082205769722,
+      "sm_betweenness": 105.40131344945006,
+      "flow_drop": 0.0,
+      "betweenness": 134876.81294918634
+    },
+    "DNp10": {
+      "published_name": "DNp10",
+      "behavior": "landing",
+      "evidence": "S+N",
+      "superclass": "descending_neuron",
+      "n_neurons": 2,
+      "sm_betweenness_percentile": 91.0518253765637,
+      "flow_drop_percentile": 69.53450770147222,
+      "betweenness_percentile": 97.93634584290699,
+      "sm_betweenness": 162.04466578557503,
+      "flow_drop": 1.0,
+      "betweenness": 200714.48686691132
+    },
+    "DNp09": {
+      "published_name": "P9",
+      "behavior": "object-directed walking; pursuit of the female",
+      "evidence": "S+N",
+      "superclass": "descending_neuron",
+      "n_neurons": 2,
+      "sm_betweenness_percentile": 47.2002382775934,
+      "flow_drop_percentile": 32.27384903412476,
+      "betweenness_percentile": 83.69925963747767,
+      "sm_betweenness": 3.519701189916531,
+      "flow_drop": 0.0,
+      "betweenness": 63350.43956455141
+    },
+    "pIP10": {
+      "published_name": "pIP10",
+      "behavior": "courtship song",
+      "evidence": "S+N",
+      "superclass": "descending_neuron",
+      "n_neurons": 2,
+      "sm_betweenness_percentile": 53.131648370351456,
+      "flow_drop_percentile": 32.27384903412476,
+      "betweenness_percentile": 91.39222193855842,
+      "sm_betweenness": 6.585732414662495,
+      "flow_drop": 0.0,
+      "betweenness": 97917.76217884259
+    },
+    "aSP22": {
+      "published_name": "aSP22 (DNa12)",
+      "behavior": "courtship action sequence",
+      "evidence": "S+N",
+      "superclass": "descending_neuron",
+      "n_neurons": 2,
+      "sm_betweenness_percentile": 95.91949621308825,
+      "flow_drop_percentile": 32.27384903412476,
+      "betweenness_percentile": 99.64683856693047,
+      "sm_betweenness": 313.0882785843368,
+      "flow_drop": 0.0,
+      "betweenness": 440401.00605670415
+    },
+    "DNa02": {
+      "published_name": "DNa02",
+      "behavior": "ipsilateral turning while walking",
+      "evidence": "S",
+      "superclass": "descending_neuron",
+      "n_neurons": 2,
+      "sm_betweenness_percentile": 85.7161092672964,
+      "flow_drop_percentile": 32.27384903412476,
+      "betweenness_percentile": 98.39588120159986,
+      "sm_betweenness": 95.53563577911366,
+      "flow_drop": 0.0,
+      "betweenness": 225471.13300248818
+    },
+    "EPG": {
+      "published_name": "E-PG compass neurons",
+      "behavior": "menotaxis (holding a heading relative to a sun stimulus)",
+      "evidence": "N",
+      "superclass": "cb_intrinsic",
+      "n_neurons": 46,
+      "sm_betweenness_percentile": 9.756616458173772,
+      "flow_drop_percentile": 32.27384903412476,
+      "betweenness_percentile": 99.05114458343971,
+      "sm_betweenness": 0.0,
+      "flow_drop": 0.0,
+      "betweenness": 272893.340682877
+    },
+    "PFL3": {
+      "published_name": "PFL3",
+      "behavior": "goal-directed steering",
+      "evidence": "S+N",
+      "superclass": "cb_intrinsic",
+      "n_neurons": 24,
+      "sm_betweenness_percentile": 54.24644711088418,
+      "flow_drop_percentile": 32.27384903412476,
+      "betweenness_percentile": 99.92766573057612,
+      "sm_betweenness": 7.365431154606034,
+      "flow_drop": 0.0,
+      "betweenness": 689480.6154992987
+    },
+    "MBON11": {
+      "published_name": "MBON-\u03b31pedc>\u03b1/\u03b2",
+      "behavior": "aversive memory expression",
+      "evidence": "N",
+      "superclass": "cb_intrinsic",
+      "n_neurons": 2,
+      "sm_betweenness_percentile": 9.756616458173772,
+      "flow_drop_percentile": 32.27384903412476,
+      "betweenness_percentile": 22.28320993957961,
+      "sm_betweenness": 0.0,
+      "flow_drop": 0.0,
+      "betweenness": 5130.182653134479
+    },
+    "PPL101": {
+      "published_name": "PPL1-\u03b31pedc",
+      "behavior": "punishment signal for aversive memory",
+      "evidence": "S+N",
+      "superclass": "cb_intrinsic",
+      "n_neurons": 2,
+      "sm_betweenness_percentile": 22.632116415624203,
+      "flow_drop_percentile": 32.27384903412476,
+      "betweenness_percentile": 46.01736022466173,
+      "sm_betweenness": 0.03722677595628415,
+      "flow_drop": 0.0,
+      "betweenness": 16583.877751970336
+    },
+    "MN9": {
+      "published_name": "mn9 motor neuron",
+      "behavior": "proboscis extension",
+      "evidence": "S+N",
+      "superclass": "cb_motor",
+      "n_neurons": 2,
+      "sm_betweenness_percentile": 9.756616458173772,
+      "flow_drop_percentile": 69.53450770147222,
+      "betweenness_percentile": 6.020764190281678,
+      "sm_betweenness": 0.0,
+      "flow_drop": 1.0,
+      "betweenness": 185.39163913948215
+    }
+  }
+}
