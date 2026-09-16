@@ -21,6 +21,8 @@ analyze:
 	$(PYTHON) -m pipeline.synthetic_lethal_pairs --workers $(WORKERS)
 	$(PYTHON) -m pipeline.bilateral_symmetry --workers $(WORKERS)
 	$(PYTHON) -m pipeline.hidden_bottleneck
+	$(PYTHON) -m pipeline.structure_profile --workers $(WORKERS)
+	$(PYTHON) -m pipeline.edge_attack
 
 validate:
 	$(PYTHON) -m pipeline.null_model --n-nulls $(NULLS) --workers $(WORKERS)
@@ -32,6 +34,7 @@ context:
 hero:
 	$(PYTHON) -m pipeline.regional_impact --workers $(WORKERS)
 	$(PYTHON) -m pipeline.render_hero
+	$(PYTHON) -m pipeline.type_atlas
 
 export:
 	$(PYTHON) -m export.build_static_json
