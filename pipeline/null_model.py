@@ -244,7 +244,7 @@ def main() -> None:
     sources, targets = load_sensory_motor_sets()
     NULL_RUNS_DIR.mkdir(parents=True, exist_ok=True)
     jobs = [(i, s) for i in range(args.n_nulls) for s in STRATEGIES]
-    with Pool(args.workers, initializer=_init_worker, initargs=(graph, sources, targets)) as pool:
+    with Pool(args.workers, initializer=_init_worker, initargs=(graph, sources, targets), maxtasksperchild=2) as pool:
         for done, (index, strategy) in enumerate(pool.imap_unordered(run_null_job, jobs), start=1):
             if done % 12 == 0 or done == len(jobs):
                 print(f"null jobs: {done}/{len(jobs)} (last: null {index} {strategy})", flush=True)

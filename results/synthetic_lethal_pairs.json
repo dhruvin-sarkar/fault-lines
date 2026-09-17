@@ -1,0 +1,236 @@
+{
+  "intact_flow": 10647,
+  "pool_size": 250,
+  "pairs_evaluated": 31125,
+  "pool_types_with_nonzero_single_impact": 250,
+  "pairs_with_positive_synergy": 585,
+  "pairs_with_negative_synergy": 39,
+  "max_synergy": 12,
+  "top_pairs": [
+    {
+      "type_a": "SNppxx",
+      "type_b": "SNta29",
+      "impact_a": 216,
+      "impact_b": 155,
+      "flow_after": 10264,
+      "joint_impact": 383,
+      "synergy": 12
+    },
+    {
+      "type_a": "SNppxx",
+      "type_b": "SNta37",
+      "impact_a": 216,
+      "impact_b": 107,
+      "flow_after": 10315,
+      "joint_impact": 332,
+      "synergy": 9
+    },
+    {
+      "type_a": "SNppxx",
+      "type_b": "SNpp52",
+      "impact_a": 216,
+      "impact_b": 85,
+      "flow_after": 10337,
+      "joint_impact": 310,
+      "synergy": 9
+    },
+    {
+      "type_a": "SNta29",
+      "type_b": "SNta20",
+      "impact_a": 155,
+      "impact_b": 82,
+      "flow_after": 10401,
+      "joint_impact": 246,
+      "synergy": 9
+    },
+    {
+      "type_a": "SNppxx",
+      "type_b": "SNta38",
+      "impact_a": 216,
+      "impact_b": 85,
+      "flow_after": 10338,
+      "joint_impact": 309,
+      "synergy": 8
+    },
+    {
+      "type_a": "SNta29",
+      "type_b": "SNta37",
+      "impact_a": 155,
+      "impact_b": 107,
+      "flow_after": 10377,
+      "joint_impact": 270,
+      "synergy": 8
+    },
+    {
+      "type_a": "SNta29",
+      "type_b": "SNta30",
+      "impact_a": 155,
+      "impact_b": 53,
+      "flow_after": 10431,
+      "joint_impact": 216,
+      "synergy": 8
+    },
+    {
+      "type_a": "SNppxx",
+      "type_b": "SNta20",
+      "impact_a": 216,
+      "impact_b": 82,
+      "flow_after": 10342,
+      "joint_impact": 305,
+      "synergy": 7
+    },
+    {
+      "type_a": "SNppxx",
+      "type_b": "SNpp51",
+      "impact_a": 216,
+      "impact_b": 47,
+      "flow_after": 10377,
+      "joint_impact": 270,
+      "synergy": 7
+    },
+    {
+      "type_a": "SApp",
+      "type_b": "SApp10",
+      "impact_a": 310,
+      "impact_b": 166,
+      "flow_after": 10165,
+      "joint_impact": 482,
+      "synergy": 6
+    },
+    {
+      "type_a": "SNppxx",
+      "type_b": "SNxx33",
+      "impact_a": 216,
+      "impact_b": 116,
+      "flow_after": 10309,
+      "joint_impact": 338,
+      "synergy": 6
+    },
+    {
+      "type_a": "SNppxx",
+      "type_b": "SNpp45",
+      "impact_a": 216,
+      "impact_b": 64,
+      "flow_after": 10361,
+      "joint_impact": 286,
+      "synergy": 6
+    },
+    {
+      "type_a": "SNpp50",
+      "type_b": "SNta29",
+      "impact_a": 59,
+      "impact_b": 155,
+      "flow_after": 10427,
+      "joint_impact": 220,
+      "synergy": 6
+    },
+    {
+      "type_a": "SNta37",
+      "type_b": "SNta20",
+      "impact_a": 107,
+      "impact_b": 82,
+      "flow_after": 10452,
+      "joint_impact": 195,
+      "synergy": 6
+    },
+    {
+      "type_a": "SApp",
+      "type_b": "SApp06,SApp15",
+      "impact_a": 310,
+      "impact_b": 97,
+      "flow_after": 10235,
+      "joint_impact": 412,
+      "synergy": 5
+    },
+    {
+      "type_a": "SApp",
+      "type_b": "SNpp35",
+      "impact_a": 310,
+      "impact_b": 19,
+      "flow_after": 10313,
+      "joint_impact": 334,
+      "synergy": 5
+    },
+    {
+      "type_a": "SNppxx",
+      "type_b": "SNta21",
+      "impact_a": 216,
+      "impact_b": 103,
+      "flow_after": 10323,
+      "joint_impact": 324,
+      "synergy": 5
+    },
+    {
+      "type_a": "SApp08",
+      "type_b": "SApp10",
+      "impact_a": 112,
+      "impact_b": 166,
+      "flow_after": 10364,
+      "joint_impact": 283,
+      "synergy": 5
+    },
+    {
+      "type_a": "SNppxx",
+      "type_b": "SNpp50",
+      "impact_a": 216,
+      "impact_b": 59,
+      "flow_after": 10367,
+      "joint_impact": 280,
+      "synergy": 5
+    },
+    {
+      "type_a": "SNxx33",
+      "type_b": "SNta29",
+      "impact_a": 116,
+      "impact_b": 155,
+      "flow_after": 10371,
+      "joint_impact": 276,
+      "synergy": 5
+    },
+    {
+      "type_a": "SNppxx",
+      "type_b": "SNta30",
+      "impact_a": 216,
+      "impact_b": 53,
+      "flow_after": 10373,
+      "joint_impact": 274,
+      "synergy": 5
+    },
+    {
+      "type_a": "SNppxx",
+      "type_b": "SNta25",
+      "impact_a": 216,
+      "impact_b": 52,
+      "flow_after": 10374,
+      "joint_impact": 273,
+      "synergy": 5
+    },
+    {
+      "type_a": "SNppxx",
+      "type_b": "SNta28",
+      "impact_a": 216,
+      "impact_b": 46,
+      "flow_after": 10380,
+      "joint_impact": 267,
+      "synergy": 5
+    },
+    {
+      "type_a": "SNpp45",
+      "type_b": "SNta29",
+      "impact_a": 64,
+      "impact_b": 155,
+      "flow_after": 10423,
+      "joint_impact": 224,
+      "synergy": 5
+    },
+    {
+      "type_a": "SNta29",
+      "type_b": "SNta28",
+      "impact_a": 155,
+      "impact_b": 46,
+      "flow_after": 10441,
+      "joint_impact": 206,
+      "synergy": 5
+    }
+  ]
+}
