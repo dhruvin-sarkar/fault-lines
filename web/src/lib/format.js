@@ -5,6 +5,23 @@ export const count = (value) => (value == null ? "n/a" : Math.round(value).toLoc
 
 export const fixed = (value, digits = 2) => (value == null ? "n/a" : Number(value).toFixed(digits));
 
+const MINUS = "\u2212";
+
+/** A count with an explicit sign, negatives with a true minus. */
+export const signedCount = (value) => (value > 0 ? `+${count(value)}` : value < 0 ? `${MINUS}${count(-value)}` : count(value));
+
+/** A number to `digits` decimals with an explicit sign, negatives with a true minus. */
+export const signedFixed = (value, digits = 2) =>
+  value > 0 ? `+${fixed(value, digits)}` : value < 0 ? `${MINUS}${fixed(-value, digits)}` : fixed(value, digits);
+
+/** Text with its first letter capitalized, for the start of a sentence, a label or a key. */
+export const sentence = (text) => (text ? `${text[0].toUpperCase()}${text.slice(1)}` : text);
+
+const NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+
+/** A count up to ten as a word, larger counts as digits. */
+export const numberWord = (n) => NUMBER_WORDS[n] ?? count(n);
+
 /** p-value: "< 0.001" below 0.001, three decimals below 0.1, two decimals above. */
 export function pValue(p) {
   if (p == null || Number.isNaN(p)) return "n/a";
@@ -20,7 +37,7 @@ export function pClause(p) {
 }
 
 /** One short name per removal strategy, used the same way in prose, legends and controls. */
-export const STRATEGY_SHORT = {
+const STRATEGY_SHORT = {
   sm_betweenness: "sensory-motor betweenness",
   betweenness: "betweenness",
   pagerank: "PageRank",
@@ -32,10 +49,10 @@ export const STRATEGY_SHORT = {
 /** Short strategy name; `capital` starts it with a capital letter, for the start of a sentence or a label. */
 export function strategyLabel(id, { capital = false } = {}) {
   const name = STRATEGY_SHORT[id] ?? String(id).replaceAll("_", " ");
-  return capital ? name.charAt(0).toUpperCase() + name.slice(1) : name;
+  return capital ? sentence(name) : name;
 }
 
-export const SUPERCLASS_NAMES = {
+const SUPERCLASS_NAMES = {
   ascending_neuron: "ascending",
   cb_intrinsic: "central brain intrinsic",
   cb_motor: "central brain motor",

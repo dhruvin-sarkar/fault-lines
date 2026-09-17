@@ -3,33 +3,20 @@ import { useRovingRows } from "./useRovingRows.js";
 import { ChartFrame, Row, Tooltip } from "../Chart.jsx";
 import { Figure, Keynote, Segmented, Sidenote, TextBlock } from "../ui.jsx";
 import { Finding, Pending, useResult } from "./Finding.jsx";
-import { LogAxes, PValue, Pow, inkColor, sentence } from "./marks.jsx";
-import { count, fixed, percent, strategyLabel } from "../../lib/format.js";
+import { ALTERNATIVES, LogAxes, PValue, Pow, inkColor, verdict } from "./marks.jsx";
+import { count, fixed, percent, sentence, signedFixed, strategyLabel } from "../../lib/format.js";
 import { useWidth } from "../../lib/hooks.js";
 import { line, log } from "../../lib/scales.js";
 import "../../styles/findings-b.css";
 
 const ID = "avalanches";
 const TITLE = "How collapse arrives";
-const ALTERNATIVES = {
-  exponential: "an exponential",
-  lognormal: "a lognormal",
-  truncated_power_law: "a truncated power law",
-};
 // Clauset, Shalizi and Newman: a power law is plausible when the bootstrap p is at least 0.1.
 const PLAUSIBLE = 0.1;
 const SIGNIFICANCE = 0.05;
 const TIP_HALF = 115;
 
 const color = inkColor;
-
-/** Plain reading of a normalized log-likelihood ratio test against one alternative. */
-function verdict(comparison, name) {
-  if (comparison.p_value >= SIGNIFICANCE) return `Cannot be told apart from ${name}`;
-  return comparison.loglikelihood_ratio > 0
-    ? `Fits better than ${name}`
-    : `${name[0].toUpperCase()}${name.slice(1)} fits better`;
-}
 
 export default function Avalanches({ meta, percolation }) {
   const { data, missing } = useResult("avalanches.json");
@@ -195,17 +182,16 @@ function AvalanchesView({ data, meta, percolation }) {
               if (!c) return null;
               return (
                 <li key={id}>
-                  <span>{verdict(c, name)}</span>
+                  <span>{verdict(c, name, SIGNIFICANCE)}</span>
                   <span className="fb-stat">
-                    R = {c.loglikelihood_ratio > 0 ? "+" : ""}
-                    {fixed(c.loglikelihood_ratio)}, <PValue p={c.p_value} />
+                    R = {signedFixed(c.loglikelihood_ratio)}, <PValue p={c.p_value} />
                   </span>
                 </li>
               );
             })}
           </ul>
           <p className="caption fb-fits-note">
-            R is the normalized log-likelihood ratio; positive R favours the power law. A p of {SIGNIFICANCE} or more
+            R is the normalized log-likelihood ratio; positive R favors the power law. A p of {SIGNIFICANCE} or more
             means the sign of R is not significant.
           </p>
         </div>
@@ -244,7 +230,7 @@ function AvalanchesView({ data, meta, percolation }) {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td>{strategyLabel(r.id)}</td>
+                  <td>{strategyLabel(r.id, { capital: true })}</td>
                   <td className="num">{count(r.batches)}</td>
                   <td className="num">{count(r.batches - r.zero_size)}</td>
                   <td className="num">{count(r.max_size)}</td>

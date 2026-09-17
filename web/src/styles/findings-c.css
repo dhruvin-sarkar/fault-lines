@@ -95,10 +95,6 @@
   fill: var(--ink);
 }
 
-.chart .fc-dot-signal {
-  fill: var(--signal);
-}
-
 .chart .fc-link {
   fill: none;
   stroke: var(--ink-2);
@@ -111,17 +107,8 @@
   stroke-width: 1.5;
 }
 
-.fc-glyph-signal {
-  fill: var(--signal);
-}
-
 .fc-glyph-ink {
   fill: var(--ink);
-}
-
-.fc-glyph-tick {
-  stroke: var(--ink);
-  stroke-width: 1.5;
 }
 
 .fc-row {
@@ -147,10 +134,6 @@
 
 .field .tooltip .fc-tip-sub {
   color: var(--field-ink-2);
-}
-
-.fc-more {
-  margin-top: 1rem;
 }
 
 /* Two figures side by side: a paper chart and a field panel. */

@@ -1,29 +1,39 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Finding } from "./Finding.jsx";
-import { useRovingRows } from "./useRovingRows.js";
+import { coarsePointer, useRovingRows } from "./useRovingRows.js";
 import { ChartFrame, Row, Tooltip, YAxis, spreadLabels } from "../Chart.jsx";
 import { Figure, Segmented, Sidenote, TextBlock } from "../ui.jsx";
 import { useData } from "../../lib/data.js";
 import { useReducedMotion, useWidth } from "../../lib/hooks.js";
 import { linear } from "../../lib/scales.js";
-import { count, fixed, pValue, superclassName } from "../../lib/format.js";
+import { count, fixed, pValue, sentence, superclassName } from "../../lib/format.js";
 import "../../styles/findings-a.css";
 
 const ID = "literature";
 const TITLE = "Agreement with experiments";
 const CONTROL = "MN9";
+
+/** The published name with the type's own name removed, e.g. "DNa12" for aSP22 (DNa12); empty when they match. */
+function alias(name, published) {
+  if (!published.toLowerCase().startsWith(name.toLowerCase())) return published;
+  return published.slice(name.length).trim().replace(/^\((.*)\)$/, "$1");
+}
+
 const METRICS = [
   { value: "sm_betweenness", label: "Sensory-motor betweenness", text: "sensory-motor betweenness" },
   { value: "betweenness", label: "Betweenness", text: "betweenness" },
   { value: "flow_drop", label: "Flow lost alone", text: "the flow capacity lost when the type is removed alone" },
 ];
 const EVIDENCE = {
-  S: "activation evokes it",
-  N: "silencing impairs it",
-  "S+N": "activation evokes it, silencing impairs it",
+  S: "Activation evokes it",
+  N: "Silencing impairs it",
+  "S+N": "Activation evokes it, silencing impairs it",
 };
 const MARGIN = { top: 34, right: 8, bottom: 14, left: 40 };
 const HEIGHT = 480;
+// Label spacing: tight for a mouse, a full touch target on touch screens.
+const LABEL_GAP = 17;
+const TOUCH_GAP = 40;
 const GAP = 12;
 
 const ordinal = (value) => {
@@ -34,7 +44,7 @@ const ordinal = (value) => {
 };
 
 /** Dots at their percentile, pushed sideways where they would overlap, with labels spread to stay apart. */
-function arrange(curated, metric, innerHeight) {
+function arrange(curated, metric, innerHeight, labelGap) {
   const y = linear([0, 100], [innerHeight, 0]);
   const entries = Object.entries(curated)
     .map(([name, info]) => ({ name, pct: info[`${metric}_percentile`] }))
@@ -49,7 +59,7 @@ function arrange(curated, metric, innerHeight) {
     }
     placed.push({ ...e, dotY, dx });
   }
-  const labels = spreadLabels(placed.map((p) => ({ name: p.name, y: p.dotY })), 17, 6, innerHeight - 2);
+  const labels = spreadLabels(placed.map((p) => ({ name: p.name, y: p.dotY })), labelGap, 6, innerHeight - 2);
   const labelY = Object.fromEntries(labels.map((l) => [l.name, l.y]));
   return Object.fromEntries(placed.map((p) => [p.name, { dx: p.dx, dotY: p.dotY, labelY: labelY[p.name], pct: p.pct }]));
 }
@@ -97,11 +107,13 @@ function LiteratureView({ data }) {
   const [hover, setHover] = useState(null);
   const [wrapRef, width] = useWidth();
   const reduced = useReducedMotion();
-  const innerHeight = HEIGHT - MARGIN.top - MARGIN.bottom;
+  const labelGap = coarsePointer() ? TOUCH_GAP : LABEL_GAP;
+  const height = Math.max(HEIGHT, Object.keys(data.curated_types).length * labelGap + MARGIN.top + MARGIN.bottom + 12);
+  const innerHeight = height - MARGIN.top - MARGIN.bottom;
 
   const layouts = useMemo(
-    () => Object.fromEntries(METRICS.map((m) => [m.value, arrange(data.curated_types, m.value, innerHeight)])),
-    [data, innerHeight],
+    () => Object.fromEntries(METRICS.map((m) => [m.value, arrange(data.curated_types, m.value, innerHeight, labelGap)])),
+    [data, innerHeight, labelGap],
   );
   const positions = useTween(layouts[metric], metric, reduced);
   const rowProps = useRovingRows(Object.keys(layouts[metric]), setHover);
@@ -139,7 +151,7 @@ function LiteratureView({ data }) {
         best = name;
       }
     }
-    setHover(bestDistance <= (x < labelX - 12 ? 14 : 9) ? best : null);
+    setHover(bestDistance <= (x < labelX - 12 ? 14 : labelGap / 2) ? best : null);
   }
 
   return (
@@ -154,7 +166,7 @@ function LiteratureView({ data }) {
           <>
             {controlInfo && (
               <Sidenote title="Positive control">
-                <span className="id">{CONTROL}</span>, the {controlInfo.published_name}, drives {controlInfo.behavior}.
+                <span className="id">{CONTROL}</span> drives {controlInfo.behavior}.
                 As a motor type it ends sensory-to-motor routes, so removing it costs flow almost by construction. It is
                 drawn as an open ring and left out of the test
                 {control ? `; including it gives AUC ${fixed(control.auc, 2)}, p = ${pValue(control.p_value)}` : ""}.
@@ -210,7 +222,7 @@ function LiteratureView({ data }) {
         <div className="fa-lit">
           <div ref={wrapRef}>
             <ChartFrame
-              height={HEIGHT}
+              height={height}
               margin={MARGIN}
               role="group"
               label={`Percentile of ${nCurated} behaviorally validated cell types and one positive control among all cell types, by ${metricText}. Use the arrow keys to move between types.`}
@@ -222,10 +234,10 @@ function LiteratureView({ data }) {
                     <div className="fa-tip">
                       <strong>
                         <span className="id">{hover}</span>
-                        {hovered.published_name !== hover && `, ${hovered.published_name}`}
+                        {alias(hover, hovered.published_name) && `, ${alias(hover, hovered.published_name)}`}
                       </strong>
                       <span className="fa-tip-sub">
-                        {hovered.behavior}
+                        {sentence(hovered.behavior)}
                         {hover === CONTROL && "; positive control, not in the test"}
                       </span>
                       <Row label="Evidence" value={EVIDENCE[hovered.evidence] ?? hovered.evidence} />
@@ -233,7 +245,7 @@ function LiteratureView({ data }) {
                         <Row key={m2.value} label={m2.label} value={ordinal(hovered[`${m2.value}_percentile`])} />
                       ))}
                       <Row label="Neurons" value={count(hovered.n_neurons)} />
-                      <Row label="Superclass" value={superclassName(hovered.superclass)} />
+                      <Row label="Superclass" value={sentence(superclassName(hovered.superclass))} />
                     </div>
                   </Tooltip>
                 ) : null
@@ -256,7 +268,7 @@ function LiteratureView({ data }) {
                       const isControl = name === CONTROL;
                       const dim = hover && hover !== name;
                       const dotX = cx + p.dx;
-                      const text = isControl ? "positive control" : info.published_name !== name ? info.published_name : null;
+                      const text = isControl ? "positive control" : alias(name, info.published_name) || null;
                       return (
                         <g
                           key={name}
@@ -268,9 +280,9 @@ function LiteratureView({ data }) {
                           <rect
                             className={`fa-band${hover === name ? " is-on" : ""}`}
                             x={labelX - 10}
-                            y={p.labelY - 9}
+                            y={p.labelY - (labelGap - 2) / 2}
                             width={Math.max(40, inner.width - labelX + 10)}
-                            height={18}
+                            height={labelGap - 2}
                             rx={3}
                           />
                           <path className="fa-leader" d={`M${dotX + 7} ${p.dotY}L${labelX - 16} ${p.dotY}L${labelX - 6} ${p.labelY}`} />
@@ -349,7 +361,7 @@ function LiteratureView({ data }) {
                     {name === CONTROL && " (positive control)"}
                   </td>
                   <td>{info.published_name}</td>
-                  <td>{info.behavior}</td>
+                  <td>{sentence(info.behavior)}</td>
                   <td>{EVIDENCE[info.evidence] ?? info.evidence}</td>
                   <td className="num">{fixed(info.sm_betweenness_percentile, 1)}</td>
                   <td className="num">{fixed(info.betweenness_percentile, 1)}</td>

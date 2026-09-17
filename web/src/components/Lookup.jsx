@@ -3,7 +3,7 @@ import Atlas, { FIELD_LIVE, atlasAspect } from "./Atlas.jsx";
 import { ChartFrame, Row, Tooltip } from "./Chart.jsx";
 import { Figure } from "./ui.jsx";
 import { useWidth } from "../lib/hooks.js";
-import { count, percent, strategyLabel, superclassName } from "../lib/format.js";
+import { count, percent, sentence, strategyLabel, superclassName } from "../lib/format.js";
 import { useRovingRows } from "./findings/useRovingRows.js";
 import { linear } from "../lib/scales.js";
 import "../styles/findings-c.css";
@@ -11,7 +11,7 @@ import "../styles/findings-c.css";
 const LIMIT = 8;
 const PICKS = 8;
 const HASH = "#lookup/";
-const COMPARTMENTS = { 0: "brain", 1: "nerve cord" };
+const COMPARTMENTS = { 0: "Brain", 1: "Nerve cord" };
 const ROLES = { 1: "sensory", 2: "descending or motor" };
 
 function hashName() {
@@ -147,7 +147,7 @@ export default function Lookup({ meta, percolation, types, atlas }) {
   }
 
   const anchor = types.anchor[selected];
-  const neighbours = useMemo(() => {
+  const neighbors = useMemo(() => {
     const set = new Set();
     if (anchor < 0) return set;
     for (let i = 0; i < total; i += 1) if (i !== selected && types.anchor[i] === anchor) set.add(i);
@@ -218,7 +218,7 @@ export default function Lookup({ meta, percolation, types, atlas }) {
                       <span className="id">
                         <Highlighted text={names[i]} query={query} />
                       </span>
-                      <span className="fc-option-meta">{superclassName(types.superclasses[types.superclass[i]])}</span>
+                      <span className="fc-option-meta">{sentence(superclassName(types.superclasses[types.superclass[i]]))}</span>
                     </li>
                   ))}
                   {listOpen && suggestions.length === 0 && (
@@ -271,7 +271,7 @@ export default function Lookup({ meta, percolation, types, atlas }) {
                   atlas={atlas}
                   tone="field"
                   focus={selected}
-                  highlight={neighbours}
+                  highlight={neighbors}
                   highlightTone="neutral"
                   label={`Map of the central nervous system with ${name} ringed and the other types in its main neuropil highlighted`}
                   onType={(i, event) => {
@@ -294,7 +294,7 @@ export default function Lookup({ meta, percolation, types, atlas }) {
                         <span className="id">{names[pointer.index]}</span>
                       </strong>
                       <span className="fc-tip-sub">
-                        {superclassName(types.superclasses[types.superclass[pointer.index]])}
+                        {sentence(superclassName(types.superclasses[types.superclass[pointer.index]]))}
                       </span>
                       <Row label="Routes lost when removed alone" value={count(types.flow_drop[pointer.index])} />
                     </div>
@@ -304,23 +304,23 @@ export default function Lookup({ meta, percolation, types, atlas }) {
               <div className="fc-map-key" aria-hidden="true">
                 <span>
                   <svg width="14" height="14" viewBox="-7 -7 14 14">
-                    <circle r="5.5" style={{ fill: "none", stroke: "var(--signal-glow)", strokeWidth: 1.5 }} />
+                    <circle r="5.5" style={{ fill: "none", stroke: "var(--field-ink)", strokeWidth: 1.5 }} />
                   </svg>
                   <span className="id">{name}</span>
                 </span>
-                {neighbours.size > 0 && (
+                {neighbors.size > 0 && (
                   <span>
                     <svg width="10" height="10" viewBox="-5 -5 10 10">
-                      <rect x="-3" y="-3" width="6" height="6" style={{ fill: "var(--signal-glow)" }} />
+                      <rect x="-3" y="-3" width="6" height="6" style={{ fill: "var(--field-ink)" }} />
                     </svg>
-                    {count(neighbours.size)} other types mostly in {types.anchors[anchor]}
+                    {count(neighbors.size)} other types mostly in {types.anchors[anchor]}
                   </span>
                 )}
                 <span>
                   <svg width="10" height="10" viewBox="-5 -5 10 10">
                     <rect x="-2" y="-2" width="4" height="4" style={{ fill: `var(--field-live, ${FIELD_LIVE})`, opacity: 0.6 }} />
                   </svg>
-                  all other types
+                  All other types
                 </span>
               </div>
             </Figure>
@@ -349,46 +349,46 @@ function Profile({ index, meta, percolation, types, ranking }) {
           {name}
         </h3>
         <p className="fc-profile-meta">
-          {anchor >= 0 && <span>most synapses in {types.anchors[anchor]}</span>}
-          {role && <span>in the {role} set</span>}
+          {anchor >= 0 && <span>Most synapses in {types.anchors[anchor]}</span>}
+          {role && <span>In the {role} set</span>}
         </p>
       </header>
 
       <dl className="facts">
         <div>
-          <dt>neurons in the type</dt>
+          <dt>Neurons in the type</dt>
           <dd>{count(neurons)}</dd>
         </div>
         <div>
-          <dt>superclass</dt>
-          <dd className="fc-fact-text">{superclassName(types.superclasses[types.superclass[index]])}</dd>
+          <dt>Superclass</dt>
+          <dd className="fc-fact-text">{sentence(superclassName(types.superclasses[types.superclass[index]]))}</dd>
         </div>
         <div>
-          <dt>compartment</dt>
-          <dd className="fc-fact-text">{COMPARTMENTS[types.compartment[index]] ?? "not assigned"}</dd>
+          <dt>Compartment</dt>
+          <dd className="fc-fact-text">{COMPARTMENTS[types.compartment[index]] ?? "Not assigned"}</dd>
         </div>
         <div>
-          <dt>input partner types</dt>
+          <dt>Input partner types</dt>
           <dd>{count(types.in_degree[index])}</dd>
         </div>
         <div>
-          <dt>output partner types</dt>
+          <dt>Output partner types</dt>
           <dd>{count(types.out_degree[index])}</dd>
         </div>
         <div>
-          <dt>input synapses, within the graph</dt>
+          <dt>Input synapses, within the graph</dt>
           <dd>{count(types.in_strength[index])}</dd>
         </div>
         <div>
-          <dt>output synapses, within the graph</dt>
+          <dt>Output synapses, within the graph</dt>
           <dd>{count(types.out_strength[index])}</dd>
         </div>
         <div>
-          <dt>routes lost when removed alone, of {count(intact)}</dt>
+          <dt>Routes lost when removed alone, of {count(intact)}</dt>
           <dd>{count(drop)}</dd>
         </div>
         <div>
-          <dt>sensory-motor pairs disconnected when removed alone, of {count(reachable)}</dt>
+          <dt>Sensory-motor pairs disconnected when removed alone, of {count(reachable)}</dt>
           <dd>{count(types.pairs_lost[index])}</dd>
         </div>
       </dl>
@@ -416,27 +416,25 @@ function Profile({ index, meta, percolation, types, ranking }) {
             <svg width="12" height="12" viewBox="-6 -6 12 12">
               <circle r="5" className="fc-glyph-ink" />
             </svg>
-            removed
+            Removed, in the strategy&apos;s color
           </span>
           <span>
             <svg width="12" height="12" viewBox="-6 -6 12 12">
               <circle r="4.25" className="fc-glyph-ring" />
             </svg>
-            cut off from all sensory input
+            Cut off from all sensory input
           </span>
           <span>
             <svg width="8" height="14" viewBox="-4 -7 8 14">
               <path d="M0 -6V6" style={{ stroke: "var(--signal)", strokeWidth: 2 }} />
             </svg>
-            flow capacity halved
+            Flow capacity halved
           </span>
         </div>
         <Timing index={index} meta={meta} percolation={percolation} types={types} />
         <p className="caption" style={{ marginTop: "1rem" }}>
           The share of cell types already removed when a strategy takes this type out, or first leaves it with no route
-          from any sensory type. Each strategy rescores the remaining types after every batch of{" "}
-          {percent(meta.protocol.batch_fraction_of_remaining, 0)} of those left; random removal shows the first of{" "}
-          {count(meta.protocol.random_trials)} trials.
+          from any sensory type. Random removal shows the first of {count(meta.protocol.random_trials)} trials.
           {meta.strategies.some((s) => types.silenced[s.id][index] === 0)
             ? " This type has no route from any sensory type even in the intact graph."
             : ""}

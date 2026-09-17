@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { ChartFrame, XAxis, YAxis } from "./Chart.jsx";
 import { Figure, HeadingLevel, Sidenote, TextBlock } from "./ui.jsx";
 import { useWidth } from "../lib/hooks.js";
-import { count, fixed, percent, strategyLabel } from "../lib/format.js";
+import { count, fixed, numberWord, percent, sentence, strategyLabel } from "../lib/format.js";
 import { line, linear } from "../lib/scales.js";
 import "../styles/measure.css";
 
@@ -65,7 +65,7 @@ const MOTOR_COUNT = NODES.filter((n) => n.kind === "motor").length;
  * Unit-capacity maximum flow from a super-source over the present sensory nodes to a super-sink over the present
  * motor nodes (Edmonds-Karp), with the source-side minimum cut and each node's share of the routes.
  */
-export function analyse(removed) {
+function analyze(removed) {
   const n = NODES.length;
   const source = n;
   const sink = n + 1;
@@ -174,16 +174,13 @@ function busiest(removed, state) {
   return best;
 }
 
-const INTACT = analyse(new Set());
+const INTACT = analyze(new Set());
 const HUBS_REMOVED = (() => {
   const removed = new Set();
-  for (let k = 0; k < 2; k += 1) removed.add(NODES[busiest(removed, analyse(removed))].id);
-  return analyse(removed);
+  for (let k = 0; k < 2; k += 1) removed.add(NODES[busiest(removed, analyze(removed))].id);
+  return analyze(removed);
 })();
 
-const NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
-const numberWord = (n) => NUMBER_WORDS[n] ?? String(n);
-const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 const routes = (k) => `${k} ${k === 1 ? "route" : "routes"}`;
 
 export default function Measure({ meta, percolation }) {
@@ -193,7 +190,7 @@ export default function Measure({ meta, percolation }) {
   const range = protocol.auc_range;
 
   return (
-    <section className="section ms" id="measure" aria-labelledby="measure-title">
+    <section className="section" id="measure" aria-labelledby="measure-title">
       <div className="wrap">
         <div className="section-head">
           <h2 id="measure-title">How fragility is measured</h2>
@@ -246,12 +243,12 @@ export default function Measure({ meta, percolation }) {
         <Toy />
 
         <div className="ms-part">
-          <h3 className="ms-subhead">{capitalize(numberWord(strategies.length))} ways to choose what goes</h3>
+          <h3 className="ms-subhead">{sentence(numberWord(strategies.length))} ways to choose what goes</h3>
           <TextBlock>
             <p>
-              Every attack is adaptive. Each step removes {percent(protocol.batch_fraction_of_remaining, 0)} of the
+              Every attack is adaptive. Each batch removes {percent(protocol.batch_fraction_of_remaining, 0)} of the
               types still present, those with the highest score, and then scores the damaged graph again before the next
-              step, so an attack on hubs keeps finding the new hubs as the old ones go. Removal continues until{" "}
+              batch, so an attack on hubs keeps finding the new hubs as the old ones go. Removal continues until{" "}
               {percent(range[1], 0)} of types are gone.
             </p>
           </TextBlock>
@@ -317,7 +314,7 @@ function Toy() {
   const [active, setActive] = useState(0);
   const nodeRefs = useRef([]);
   const [box, width] = useWidth(720);
-  const state = useMemo(() => analyse(removed), [removed]);
+  const state = useMemo(() => analyze(removed), [removed]);
 
   const vertical = width < 560;
   const size = vertical ? { w: width, h: 400 } : { w: width, h: Math.round(Math.max(360, Math.min(460, width * 0.56))) };
@@ -332,7 +329,7 @@ function Toy() {
 
   function apply(next, text, carried = 0) {
     setRemoved(next);
-    const after = analyse(next);
+    const after = analyze(next);
     let change = `Flow ${after.flow < state.flow ? "falls" : "rises"} from ${state.flow} to ${after.flow}.`;
     if (after.flow === state.flow) {
       change = carried > 0 ? `${carried === 1 ? "Its route found another path" : "Its routes found other paths"}, so flow stays at ${after.flow}.` : `Flow stays at ${after.flow}.`;
@@ -341,8 +338,8 @@ function Toy() {
     setAnnouncement(`Flow ${after.flow} of ${INTACT.flow} routes, ${after.pairs} of ${INTACT.pairs} pairs reachable.`);
   }
 
-  // Arrow keys move to the nearest node in that direction, favouring nodes straight ahead.
-  function neighbour(from, key) {
+  // Arrow keys move to the nearest node in that direction, favoring nodes straight ahead.
+  function neighbor(from, key) {
     const [ux, uy] = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] }[key];
     const pick = (cone) => {
       let best = -1;
@@ -371,7 +368,7 @@ function Toy() {
       toggle(i);
       return;
     }
-    if (event.key.startsWith("Arrow")) target = neighbour(i, event.key);
+    if (event.key.startsWith("Arrow")) target = neighbor(i, event.key);
     else if (event.key === "Home") target = 0;
     else if (event.key === "End") target = NODES.length - 1;
     else return;
@@ -424,7 +421,7 @@ function Toy() {
   if (focusNode) {
     note = removed.has(focusNode.id)
       ? `This ${KIND_NAME[focusNode.kind]} is removed. Select it to restore it.`
-      : `${capitalize(withArticle(focusNode.kind))} with ${DEGREE[focus]} connections, carrying ${routes(state.load[focus])} of ${state.flow}. Select it to remove it.`;
+      : `${sentence(withArticle(focusNode.kind))} with ${DEGREE[focus]} connections, carrying ${routes(state.load[focus])} of ${state.flow}. Select it to remove it.`;
   }
 
   const controls = (
@@ -464,7 +461,7 @@ function Toy() {
             } intermediate and ${MOTOR_COUNT} motor. Each type is a button that removes or restores it; arrow keys move between types.`}
           >
             <LayerLabels points={points} vertical={vertical} size={size} />
-            <g className="ms-edges" aria-hidden="true">
+            <g aria-hidden="true">
               {EDGES.map(([a, b], i) => {
                 const gone = removed.has(a) || removed.has(b);
                 if (state.used.has(i)) return null;
@@ -483,7 +480,7 @@ function Toy() {
                 ))}
               </g>
             )}
-            <g className="ms-nodes">
+            <g>
               {NODES.map((node, i) => {
                 const gone = removed.has(node.id);
                 const idle = !gone && state.load[i] === 0;
@@ -497,7 +494,7 @@ function Toy() {
                     ref={(el) => (nodeRefs.current[i] = el)}
                     tabIndex={i === active ? 0 : -1}
                     aria-pressed={gone}
-                    aria-label={`${capitalize(KIND_NAME[node.kind])} ${ORDINAL[i]}, ${
+                    aria-label={`${sentence(KIND_NAME[node.kind])} ${ORDINAL[i]}, ${
                       gone ? "removed" : `carrying ${routes(state.load[i])}`
                     }`}
                     onClick={() => toggle(i)}
@@ -630,13 +627,13 @@ function LayerLabels({ points, vertical, size }) {
   return (
     <g className="ms-layer-labels" aria-hidden="true">
       <text x={first.x - 10} y={16}>
-        Sensory
+        Sensory types
       </text>
       <text x={middle} y={16} textAnchor="middle">
         Intermediate types
       </text>
       <text x={last.x + 10} y={16} textAnchor="end">
-        Descending and motor
+        Descending and motor types
       </text>
     </g>
   );
@@ -733,7 +730,7 @@ function Summary({ meta, percolation }) {
                 <path d={area(target.pts)} className="ms-area is-target" style={{ fill: `var(--s-${target.id}-ink)` }} />
                 <line x1={0} x2={w} y1={y(0.5)} y2={y(0.5)} className="ms-half" />
                 <text className="ms-half-label" x={w} y={y(0.5) + (narrow ? 15 : -7)} textAnchor="end">
-                  half of intact flow
+                  Half of intact
                 </text>
                 {series.map((s) => (
                   <path

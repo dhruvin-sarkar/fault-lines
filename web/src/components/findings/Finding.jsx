@@ -39,8 +39,8 @@ export function useResult(name) {
   return { data, missing: missing || Boolean(error) };
 }
 
-/** Placeholder shown only in local builds where an analysis has not finished. */
-export function Pending({ id, title, level }) {
+/** Placeholder for an analysis whose results are not in this build; `children` replaces the default note. */
+export function Pending({ id, title, level, children }) {
   const { Tag } = useHeading(level);
   return (
     <article className="finding" id={id} aria-labelledby={`${id}-title`}>
@@ -49,7 +49,7 @@ export function Pending({ id, title, level }) {
           {title}
         </Tag>
       </header>
-      <p className="pending plate">This analysis has not been exported in this build.</p>
+      <p className="pending">{children ?? "The results of this analysis will appear here once they are exported."}</p>
     </article>
   );
 }

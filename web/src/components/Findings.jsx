@@ -169,7 +169,7 @@ function useKeyResults({ meta, percolation }) {
       value: percent(structure.types_in_deepest_core / structure.types),
       title: `of cell types share the deepest core of the graph, k = ${structure.max_coreness}`,
       note: strength
-        ? `Output synapses per type run from a median of ${count(strength.median)} to ${count(strength.max)}.`
+        ? `Output synapses per type run from a median of ${count(strength.median)} to a maximum of ${count(strength.max)}.`
         : null,
     });
   }
@@ -225,9 +225,9 @@ export default function Findings(props) {
   const { meta } = props;
 
   return (
-    <section className="section fi-section" id="findings" aria-labelledby="findings-title">
+    <section className="section" id="findings" aria-labelledby="findings-title">
       <div className="wrap">
-        <header className="fi-open">
+        <header>
           <h2 id="findings-title" className="chapter-title fi-title">
             A few cell types carry the routing
           </h2>
@@ -235,10 +235,9 @@ export default function Findings(props) {
             <Lede {...lede} />
             <div className="notes">
               {meta.graph && (
-                <Sidenote title="The graph">
-                  {count(meta.graph.cell_types)} cell types joined by {count(meta.graph.edges)} connections, with{" "}
-                  {count(meta.graph.sensory_types)} sensory and {count(meta.graph.motor_types)} descending or motor
-                  types. Each result below opens its chapter.
+                <Sidenote title="Reading the results">
+                  Each result below links to its chapter. Shares of flow are of the {count(meta.graph.intact_flow)}{" "}
+                  routes the intact graph can run at once.
                 </Sidenote>
               )}
             </div>

@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Finding } from "./Finding.jsx";
-import { inkColor as ink, sentence } from "./marks.jsx";
+import { inkColor as ink } from "./marks.jsx";
 import { useRovingRows } from "./useRovingRows.js";
 import { ChartFrame, Row, Tooltip } from "../Chart.jsx";
 import { Figure, Sidenote, TextBlock } from "../ui.jsx";
 import { useData } from "../../lib/data.js";
 import { useWidth } from "../../lib/hooks.js";
 import { log } from "../../lib/scales.js";
-import { count, percent } from "../../lib/format.js";
+import { percent, sentence } from "../../lib/format.js";
 import "../../styles/findings-a.css";
 
 const TICKS = [0.02, 0.05, 0.1, 0.2, 0.5, 1];
@@ -27,7 +27,10 @@ const tickLabel = (t) => `${Math.round(t * 100)}%`;
 const shown = (row) =>
   `${row.qualifier === "=" ? "" : `${row.qualifier} `}${row.strategy ? percent(row.value) : `${+(row.value * 100).toFixed(1)}%`}`;
 
-const spoken = (row) => shown(row).replace("≈ ", "about ").replace("> ", "more than ");
+const spoken = (row) => shown(row).replace("≈ ", "roughly ").replace("> ", "more than ");
+
+/** A published network's name without its size or qualifier, for running text. */
+const shortName = (row) => row.network.split(/[,(]/)[0].trim();
 
 let measurer;
 function textWidth(text, font) {
@@ -94,9 +97,8 @@ export default function Thresholds({ meta, percolation }) {
   const allBelow = targeted.every((r) => r.value < random.ci[0]);
   const published = rows.filter((r) => !r.strategy);
   const hubs = published.filter((r) => r.group === "published, targeted");
-  const brains = published.filter((r) => /brain/i.test(r.network));
+  const brain = published.filter((r) => /brain/i.test(r.network)).at(-1);
   const closeToWorst = hubs.filter((r) => Math.abs(r.value - worst.value) <= 0.03);
-  const batch = meta.protocol.batch_fraction_of_remaining;
 
   // Row labels sit in a left column wide enough for the longest label; if that column would crowd the plot,
   // labels move above their rows instead.
@@ -147,23 +149,15 @@ export default function Thresholds({ meta, percolation }) {
     >
       <TextBlock
         notes={
-          <>
-            <Sidenote title="Flow capacity">
-              The number of edge-disjoint routes from the {count(meta.graph.sensory_types)} sensory types to the{" "}
-              {count(meta.graph.motor_types)} descending and motor types: {count(meta.graph.intact_flow)} in the intact
-              graph.
-            </Sidenote>
-            <Sidenote title="Not the same yardstick">
-              Most published thresholds track the largest connected cluster on undirected graphs, often with a ranking
-              fixed on the intact network. A source-to-sink capacity can halve long before such a cluster breaks up.
-            </Sidenote>
-          </>
+          <Sidenote title="Not the same yardstick">
+            Most published thresholds track the largest connected cluster on undirected graphs, often with a ranking
+            fixed on the intact network. A source-to-sink capacity can halve long before such a cluster breaks up.
+          </Sidenote>
         }
       >
         <p>
-          Removing cell types in order of {worst.label}, with scores recomputed after each {percent(batch, 0)} of the
-          remaining types, halves flow capacity once {percent(worst.value)} of types are gone. Removing them at random
-          takes {percent(random.value)} (95% CI {percent(random.ci[0])} to {percent(random.ci[1])}).{" "}
+          Removing cell types in order of {worst.label} halves flow capacity once {percent(worst.value)} of types are
+          gone. Removing them at random takes {percent(random.value)} (95% CI {percent(random.ci[0])} to {percent(random.ci[1])}).{" "}
           {allBelow
             ? "Every targeted strategy crosses the halfway point before the lower end of that interval."
             : "Not every targeted strategy crosses the halfway point before the lower end of that interval."}
@@ -171,10 +165,12 @@ export default function Thresholds({ meta, percolation }) {
         {hubs.length > 0 && (
           <p>
             {closeToWorst.length > 0
-              ? `That is the range published for engineered networks under hub attack (${closeToWorst.map((r) => `${r.citation}, ${spoken(r)}`).join("; ")})`
-              : `Published thresholds under hub attack range from ${spoken(hubs[0])} to ${spoken(hubs[hubs.length - 1])}`}
-            {brains.length > 0 && `, and well below the ${spoken(brains[brains.length - 1])} reported for human functional brain networks`}
-            . The criteria differ, so the comparison supports a qualitative reading only.
+              ? `That is the range published for engineered networks under hub attack: ${closeToWorst
+                  .map((r) => `${shortName(r)}, ${spoken(r)} (${r.citation})`)
+                  .join("; ")}.`
+              : `Published thresholds under hub attack range from ${spoken(hubs[0])} to ${spoken(hubs[hubs.length - 1])}.`}
+            {brain && ` ${shortName(brain)}s hold out far longer, to ${spoken(brain)} (${brain.citation}).`}{" "}
+            The criteria differ, so the comparison supports a qualitative reading only.
           </p>
         )}
       </TextBlock>
@@ -184,9 +180,9 @@ export default function Thresholds({ meta, percolation }) {
         caption={
           <>
             Each row is one network and one removal order; its mark sits at the fraction of nodes removed when that
-            study judged the network broken. Coloured marks are this connectome, where breakdown means flow capacity
+            study judged the network broken. Colored marks are this connectome, where breakdown means flow capacity
             falls below half its intact value; random removal is the open diamond, with capped whiskers for the 95%
-            confidence interval over {random.removal.match(/\d+/)?.[0] ?? "the"} trials. Grey marks are published
+            confidence interval over {random.removal.match(/\d+/)?.[0] ?? "the"} trials. Gray marks are published
             values: filled where the source prints a value, open where it gives an approximate one, and a triangle for
             a lower bound. The breakdown criterion is printed under each published network. Hover a row, or focus the
             chart and use the arrow keys, for its source.
@@ -239,7 +235,7 @@ export default function Thresholds({ meta, percolation }) {
                 <Tooltip x={m.left + scale(row.value)} y={m.top + activeItem.y - 10} width={w}>
                   <div className="fa-tip">
                     <strong>{row.network ?? `Male CNS cell types, ${row.label}`}</strong>
-                    <span className="fa-tip-sub">{row.removal}</span>
+                    <span className="fa-tip-sub">{sentence(row.removal)}</span>
                     <Row label="Removed at breakdown" value={shown(row)} />
                     {row.ci && <Row label="95% CI" value={`${percent(row.ci[0])} to ${percent(row.ci[1])}`} />}
                     <span className="fa-tip-sub">Criterion: {row.criterion}</span>
@@ -331,7 +327,7 @@ export default function Thresholds({ meta, percolation }) {
                         </text>
                         {!own && (
                           <text className="fa-row-sub" x={labelX} y={subY}>
-                            {row.criterion}; {row.citation}
+                            {sentence(row.criterion)}; {row.citation}
                           </text>
                         )}
                       </g>
@@ -361,8 +357,8 @@ export default function Thresholds({ meta, percolation }) {
               {rows.map((row) => (
                 <tr key={row.key}>
                   <td>{row.network ?? `Male CNS cell types, ${row.label}`}</td>
-                  <td>{row.removal}</td>
-                  <td>{row.criterion}</td>
+                  <td>{sentence(row.removal)}</td>
+                  <td>{sentence(row.criterion)}</td>
                   <td className="num">
                     {shown(row)}
                     {row.ci && ` (95% CI ${percent(row.ci[0])} to ${percent(row.ci[1])})`}

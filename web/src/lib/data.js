@@ -38,6 +38,5 @@ export function useAvailable() {
   return data ? new Set(data.available) : null;
 }
 
-export const figureUrl = (name) => `${base}figures/${name}`;
 export const repoUrl = "https://github.com/dhruvin-sarkar/fault-lines";
 export const blobUrl = (path) => `${repoUrl}/blob/main/${path}`;

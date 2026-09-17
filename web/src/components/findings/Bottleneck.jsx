@@ -3,26 +3,16 @@ import Atlas, { FIELD_LIVE, atlasAspect } from "../Atlas.jsx";
 import { ChartFrame, Row, Tooltip } from "../Chart.jsx";
 import { Figure, Keynote, Segmented, Sidenote, TextBlock } from "../ui.jsx";
 import { useWidth } from "../../lib/hooks.js";
-import { count, fixed, percent, superclassName } from "../../lib/format.js";
+import { count, fixed, numberWord, percent, sentence, superclassName } from "../../lib/format.js";
 import { linear } from "../../lib/scales.js";
 import { Finding, Pending, useResult } from "./Finding.jsx";
-import { useRovingRows } from "./useRovingRows.js";
+import { activateOr, coarsePointer, useRovingRows } from "./useRovingRows.js";
 import "../../styles/findings-c.css";
 
 const ID = "bottleneck";
 const TITLE = "A hidden bottleneck";
 
 const plural = (n, one, many) => (n === 1 ? one : many);
-
-const coarsePointer = () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
-
-/** Enter and Space activate a row; every other key goes to the row's own handler. */
-function activateOr(event, activate, otherwise) {
-  if (event.key === "Enter" || event.key === " ") {
-    event.preventDefault();
-    activate();
-  } else otherwise(event);
-}
 
 function ordinal(n) {
   const tens = n % 100;
@@ -111,7 +101,7 @@ function BottleneckView({ data, types, atlas }) {
 
       <div className="fc-duo">
         <Figure
-          title={`Where the ${count(candidates.length)} ${plural(candidates.length, "candidate ranks", "candidates rank")} among all types`}
+          title={`Where the ${numberWord(candidates.length)} ${plural(candidates.length, "candidate ranks", "candidates rank")} among all types`}
           caption={
             <>
               Percentiles among all {count(types.name.length)} types. The shaded span is where a type must fall to
@@ -137,7 +127,7 @@ function BottleneckView({ data, types, atlas }) {
               />
             ) : null
           }
-          caption="Brain above, nerve cord below, one point per cell type. The candidates glow red; the selected one is ringed."
+          caption="Brain above, nerve cord below, one point per cell type. The candidates are drawn in white; the selected one is ringed."
         >
           <div className="fc-map" style={{ aspectRatio: `${aspect}`, maxWidth: `calc(40rem * ${aspect})` }}>
             <Atlas
@@ -153,21 +143,21 @@ function BottleneckView({ data, types, atlas }) {
           <div className="fc-map-key" aria-hidden="true">
             <span>
               <svg width="14" height="14" viewBox="-7 -7 14 14">
-                <circle r="5.5" style={{ fill: "none", stroke: "var(--signal-glow)", strokeWidth: 1.5 }} />
+                <circle r="5.5" style={{ fill: "none", stroke: "var(--field-ink)", strokeWidth: 1.5 }} />
               </svg>
-              selected
+              Selected
             </span>
             <span>
               <svg width="10" height="10" viewBox="-5 -5 10 10">
-                <rect x="-3" y="-3" width="6" height="6" style={{ fill: "var(--signal-glow)" }} />
+                <rect x="-3" y="-3" width="6" height="6" style={{ fill: "var(--field-ink)" }} />
               </svg>
-              candidates
+              Candidates
             </span>
             <span>
               <svg width="10" height="10" viewBox="-5 -5 10 10">
                 <rect x="-2" y="-2" width="4" height="4" style={{ fill: `var(--field-live, ${FIELD_LIVE})`, opacity: 0.6 }} />
               </svg>
-              other cell types
+              Other cell types
             </span>
           </div>
           {currentIndex != null && (
@@ -176,7 +166,7 @@ function BottleneckView({ data, types, atlas }) {
                 <span className="id">{current.cell_type}</span>
               </strong>
               <span>
-                {superclassName(current.superclass)}, {count(types.neurons[currentIndex])}{" "}
+                {sentence(superclassName(current.superclass))}, {count(types.neurons[currentIndex])}{" "}
                 {plural(types.neurons[currentIndex], "neuron", "neurons")}
                 {types.anchor[currentIndex] >= 0 ? `, mostly in ${types.anchors[types.anchor[currentIndex]]}` : ""}
               </span>
@@ -204,20 +194,20 @@ function BottleneckView({ data, types, atlas }) {
       <dl className="facts">
         <div>
           <dt>
-            routes left without <span className="id">{ex.cell_type}</span>, of {count(ex.intact_flow)}
+            Routes left without <span className="id">{ex.cell_type}</span>, of {count(ex.intact_flow)}
           </dt>
           <dd>{count(ex.flow_after_removal)}</dd>
         </div>
         <div>
-          <dt>sensory-motor pairs disconnected when it alone is removed</dt>
+          <dt>Sensory-motor pairs disconnected when it alone is removed</dt>
           <dd>{count(ex.pairs_lost_when_removed)}</dd>
         </div>
         <div>
-          <dt>pairs whose shortest route gets longer without it</dt>
+          <dt>Pairs whose shortest route gets longer without it</dt>
           <dd>{count(ex.pairs_with_longer_shortest_path_when_removed)}</dd>
         </div>
         <div>
-          <dt>synapses in and out, within the graph</dt>
+          <dt>Synapses in and out, within the graph</dt>
           <dd>
             {count(ex.in_strength)} / {count(ex.out_strength)}
           </dd>
@@ -226,7 +216,7 @@ function BottleneckView({ data, types, atlas }) {
 
       <details className="more">
         <summary>
-          All {count(candidates.length)} {plural(candidates.length, "candidate", "candidates")} as a table
+          All {numberWord(candidates.length)} {plural(candidates.length, "candidate", "candidates")} as a table
         </summary>
         <div className="table-wrap">
           <table className="data">
@@ -249,7 +239,7 @@ function BottleneckView({ data, types, atlas }) {
                     <td>
                       <span className="id">{c.cell_type}</span>
                     </td>
-                    <td>{superclassName(c.superclass)}</td>
+                    <td>{sentence(superclassName(c.superclass))}</td>
                     <td className="num">
                       {count(c.degree)}
                       {i != null && types.in_degree[i] + types.out_degree[i] === c.degree
@@ -494,7 +484,7 @@ function PartnerDiagram({ example }) {
             <strong>
               <span className="id">{hovered.cell_type}</span>
             </strong>
-            <span className="fc-tip-sub">{superclassName(hovered.superclass)}</span>
+            <span className="fc-tip-sub">{sentence(superclassName(hovered.superclass))}</span>
             <Row
               label={hovered.side === "in" ? `Synapses onto ${example.cell_type}` : `Synapses from ${example.cell_type}`}
               value={count(hovered.synapses)}

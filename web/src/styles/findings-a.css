@@ -28,12 +28,6 @@
   stroke-width: 2;
 }
 
-.fa-glyph-dash {
-  stroke: var(--rule-strong);
-  stroke-width: 1.5;
-  stroke-dasharray: 4 3;
-}
-
 .fa-diamond {
   fill: var(--paper);
   stroke-width: 1.75;
@@ -377,13 +371,6 @@
 .fa-unscored .swatch {
   background: #0b0f12;
   box-shadow: 0 0 0 1px var(--field-rule);
-}
-
-.fa-bars-title {
-  margin-bottom: 0.5rem;
-  font-size: var(--step--1);
-  font-weight: 600;
-  color: var(--field-ink);
 }
 
 .field .legend {

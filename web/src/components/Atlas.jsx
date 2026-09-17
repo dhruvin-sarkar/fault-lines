@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTokens } from "../lib/hooks.js";
 
-const TOKENS = ["ink", "ink-2", "muted", "hair", "signal", "signal-glow", "tissue", "tissue-edge", "plate", "ground",
-  "field-ink", "field-ink-2", "field-ink-3", "field-rule", "field-tissue", "field-ghost", "field-live"];
+const TOKENS = ["ink", "muted", "signal", "signal-glow", "tissue", "tissue-edge",
+  "field-ink", "field-ink-3", "field-rule", "field-tissue", "field-ghost", "field-live"];
 
-/** Colour of intact cell types on the field, for legends drawn outside the canvas; equal to --field-live. */
+/** Color of intact cell types on the field, for legends drawn outside the canvas; equal to --field-live. */
 export const FIELD_LIVE = "#b9dcff";
 
 /*
@@ -59,7 +59,8 @@ export function atlasAspect(types, atlas) {
  * Point state comes from `removedAt` / `silencedAt` batch arrays and the current `batch`; `regionFill`
  * turns the outlines into a choropleth; `highlight` (a set of type indices) and `focus` (one index)
  * pick out types; `tone` is "paper" or "field"; `ghostAlpha`, `silentColor` and `silentAlpha` set how removed and
- * cut-off types are drawn; `highlightTone` "neutral" draws highlighted types in ink instead of the signal red; `onRegion` and `onType` report what the pointer is over.
+ * cut-off types are drawn; `highlightTone` "neutral" draws highlighted and focused types in ink instead of the signal red;
+ * `onRegion` and `onType` report what the pointer is over.
  */
 export default function Atlas({
   types,
@@ -164,18 +165,19 @@ export default function Atlas({
     ctx.globalCompositeOperation = "source-over";
     paint(groups.silent, silentColor ?? ink.silent, silentAlpha, r * 0.85);
     ctx.globalCompositeOperation = ink.blend;
-    paint(groups.hot, highlightTone === "neutral" ? ink.active : ink.signal, 0.95, r * 1.35);
+    const mark = highlightTone === "neutral" ? ink.active : ink.signal;
+    paint(groups.hot, mark, 0.95, r * 1.35);
     paint(groups.fresh, ink.signal, 1, r * 1.9);
     ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = 1;
 
     if (focus != null && types.x[focus] != null) {
-      ctx.strokeStyle = ink.signal;
+      ctx.strokeStyle = mark;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(px(focus), py(focus), 9, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.fillStyle = ink.signal;
+      ctx.fillStyle = mark;
       ctx.fillRect(px(focus) - r, py(focus) - r, r * 2, r * 2);
     }
   }, [size, colors, outlines, extent, types, batch, removedAt, silencedAt, regionFill, activeRegion, highlight, focus, pointAlpha, ghostAlpha, silentColor, silentAlpha, highlightTone, tone]);

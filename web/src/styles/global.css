@@ -27,10 +27,9 @@
 
   /* The one signal: the point where routing breaks, and the types taken out. */
   --signal: #c21f3a;
-  --signal-soft: #f6d5db;
   --signal-glow: #ff4b63;
 
-  /* Strategy colours, fixed per strategy and checked for colour-vision-deficiency separation. */
+  /* Strategy colors, fixed per strategy and checked for color-vision-deficiency separation. */
   --s-sm_betweenness: #2a78d6;
   --s-betweenness: #eb6834;
   --s-pagerank: #1baf7a;
@@ -51,20 +50,13 @@
   --s-in_strength-ink: #b24b74;
   --s-random-ink: #687075;
 
-  /* Earlier names, kept so every component reads the same palette. */
-  --ground: #f3f5f5;
-  --plate: #fbfcfc;
-  --plate-2: #e5e9ea;
+  /* Atlas canvas on paper. */
   --muted: #5b666b;
-  --hair: #d3d9db;
-  --axis: #a9b2b6;
   --tissue: #dde2e3;
   --tissue-edge: #bcc5c8;
 
   --serif: "Source Serif 4 Variable", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
   --sans: "Archivo Variable", "Segoe UI", system-ui, sans-serif;
-  --font: var(--sans);
-  --mono: var(--sans);
 
   --step--2: 0.75rem;
   --step--1: 0.875rem;
@@ -74,7 +66,6 @@
   --step-3: 2.125rem;
   --step-4: clamp(2.25rem, 1.6rem + 2.4vw, 3.25rem);
   --step-5: clamp(2.6rem, 2rem + 2vw, 3.6rem);
-  --step-6: clamp(3rem, 2rem + 3.5vw, 5.25rem);
   --step-hero: clamp(3.4rem, 1.4rem + 7.4vw, 8.5rem);
 
   --measure: 40rem;
@@ -84,7 +75,6 @@
   --nav-height: 3.5rem;
   --radius: 6px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 *,
@@ -115,6 +105,11 @@ body {
   font-variant-numeric: lining-nums tabular-nums;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+sub,
+sup {
+  line-height: 0;
 }
 
 img,
@@ -303,12 +298,6 @@ em {
   color: var(--signal);
 }
 
-.plate {
-  background: var(--paper-raised);
-  border-radius: var(--radius);
-  box-shadow: 0 0 0 1px var(--rule);
-}
-
 /* Layout */
 .wrap {
   width: 100%;
@@ -489,12 +478,6 @@ main {
 .figure-field :focus-visible,
 .field :focus-visible {
   outline-color: var(--field-ink);
-}
-
-.two-up {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(1rem, 2.5vw, 2rem);
 }
 
 .facts {
@@ -708,7 +691,6 @@ main {
   color: var(--ink-2);
 }
 
-.slider output,
 .slider-value {
   min-width: 5ch;
   text-align: right;
@@ -731,7 +713,7 @@ input[type="range"] {
   }
   .figure-controls .segmented {
     display: grid;
-    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-columns: auto;
     grid-auto-flow: column;
     width: 100%;
   }
@@ -739,6 +721,7 @@ input[type="range"] {
     justify-content: center;
     white-space: normal;
     text-align: center;
+    line-height: 1.25;
   }
   /* Five or more options would be too narrow as columns; two per row instead. */
   .figure-controls .segmented:has(> button:nth-child(5)) {
@@ -806,6 +789,7 @@ input[type="search"]::placeholder {
   flex: none;
   display: inline-flex;
   align-items: center;
+  min-height: 2.5rem;
   gap: 0.55rem;
   font-family: var(--serif);
   font-size: var(--step-1);
@@ -988,17 +972,6 @@ input[type="search"]::placeholder {
 
 .hero input[type="range"] {
   accent-color: var(--field-ink);
-}
-
-.hero-readout {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 0.75rem 2.5rem;
-}
-
-.hero-readout .display {
-  font-size: var(--step-6);
 }
 
 .hero-figure {
@@ -1268,9 +1241,6 @@ input[type="search"]::placeholder {
   .finding-head {
     grid-template-columns: 1fr;
   }
-  .two-up {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* Axes and chart text */
@@ -1337,6 +1307,7 @@ input[type="search"]::placeholder {
   z-index: 6;
   display: grid;
   gap: 0.15rem;
+  width: max-content;
   min-width: 10rem;
   max-width: 18rem;
   padding: 0.55rem 0.7rem;
@@ -1505,14 +1476,10 @@ pre.cmd {
   color: var(--ink);
 }
 
-.pending,
-.pending.plate {
+.pending {
   max-width: var(--measure);
   padding: 0.9rem 0 0;
   border-top: 1px solid var(--rule);
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
   color: var(--ink-3);
   font-size: var(--step--1);
 }

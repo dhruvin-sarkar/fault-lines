@@ -2,12 +2,11 @@ import { useMemo, useState } from "react";
 import Atlas from "./Atlas.jsx";
 import { Segmented } from "./ui.jsx";
 import { blobUrl } from "../lib/data.js";
-import { count, percent } from "../lib/format.js";
+import { count, numberWord, percent } from "../lib/format.js";
 import "../styles/hero.css";
 
 const LEAD = "out_strength";
 const REPORT_PDF = blobUrl("paper/report.pdf");
-const NUMBER_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
 
 export default function Hero({ meta, percolation, types, atlas }) {
   const [view, setView] = useState("halved");
@@ -54,7 +53,7 @@ export default function Hero({ meta, percolation, types, atlas }) {
             {count(meta.protocol.random_trials)} runs.
           </p>
           <p className="hero-links">
-            <a href="#collapse">Watch the {NUMBER_WORDS[attacks] ?? count(attacks)} attacks</a>
+            <a href="#collapse">Watch the {numberWord(attacks)} attacks</a>
             <a href={REPORT_PDF}>Read the report</a>
           </p>
         </div>
@@ -68,7 +67,7 @@ export default function Hero({ meta, percolation, types, atlas }) {
               label={`Map of the male central nervous system with ${count(map.placed)} cell types, all intact.`}
             />
           </div>
-          <div className={`hero-layer hero-layer-top ${halved ? "is-shown" : ""}`} aria-hidden={!halved}>
+          <div className={`hero-layer ${halved ? "is-shown" : ""}`} aria-hidden={!halved}>
             <Atlas
               tone="field"
               types={types}

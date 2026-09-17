@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { ChartFrame, Row, Tooltip, XAxis, YAxis } from "../Chart.jsx";
-import { Figure, Keynote, Segmented, Sidenote, TextBlock } from "../ui.jsx";
+import { Figure, Keynote, Segmented, TextBlock } from "../ui.jsx";
 import { Finding, Pending, useResult } from "./Finding.jsx";
-import { LineLabels, inkColor, labelRoom, sentence, xTicks } from "./marks.jsx";
-import { count, indexAt, percent, strategyLabel } from "../../lib/format.js";
+import { LineLabels, inkColor, labelRoom, xTicks } from "./marks.jsx";
+import { count, indexAt, percent, strategyLabel, sentence } from "../../lib/format.js";
 import { useWidth } from "../../lib/hooks.js";
 import { line, linear } from "../../lib/scales.js";
 import "../../styles/findings-b.css";
@@ -67,17 +67,11 @@ function ConnectionsView({ data, percolation }) {
     >
       <TextBlock
         notes={
-          <>
-            <Sidenote title="A connection">
-              A directed edge between two cell types, kept when it supplies enough of the target type&apos;s input
-              synapses to pass the graph&apos;s threshold; there are {count(data.edges)} of them.
-            </Sidenote>
-            {typeTarget != null && (
-              <Keynote value={percent(typeTarget)}>
-                of cell types removed by {strategyLabel("out_strength")} halves flow, against {percent(typeRandom)} at random
-              </Keynote>
-            )}
-          </>
+          typeTarget != null && (
+            <Keynote value={percent(typeTarget)}>
+              of cell types removed by {strategyLabel("out_strength")} halves flow, against {percent(typeRandom)} at random
+            </Keynote>
+          )
         }
       >
         <p>
@@ -173,8 +167,7 @@ function ConnectionsChart({ data, orders, random }) {
       controls={<Segmented label="Measure" options={METRICS} value={metric} onChange={setMetric} />}
       caption={
         <>
-          Each line follows one removal order as a share of the intact value. A connection counts once in flow capacity
-          whatever its synapse count.{" "}
+          Each line follows one removal order as a share of the intact value.{" "}
           {metric === "flow"
             ? `Red marks show where flow capacity falls to half${orders.some((o) => data.orders[o.id].critical_fraction == null) ? `; ${orders.filter((o) => data.orders[o.id].critical_fraction == null).map((o) => o.label).join(" and ")} never gets there` : ""}. `
             : ""}

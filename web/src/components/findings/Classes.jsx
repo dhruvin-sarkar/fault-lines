@@ -5,7 +5,7 @@ import { ChartFrame, Row, Tooltip } from "../Chart.jsx";
 import { Figure, Segmented, Sidenote, TextBlock } from "../ui.jsx";
 import { useReducedMotion, useWidth } from "../../lib/hooks.js";
 import { linear } from "../../lib/scales.js";
-import { count, percent, pValue, superclassName } from "../../lib/format.js";
+import { count, percent, pValue, sentence, superclassName } from "../../lib/format.js";
 import "../../styles/findings-a.css";
 
 const ID = "classes";
@@ -77,7 +77,7 @@ function ClassesView({ data }) {
           capacity, where random sets of the same size cost {percent(top.random_mean)}.
         </p>
         <p>
-          {above.length} of {rows.length} superclasses lose more than their random sets at p &lt; {SIGNIFICANCE}.
+          Of the {rows.length} superclasses, {above.length} lose more than their random sets at p &lt; {SIGNIFICANCE}.
           {below.excess_over_random < 0 &&
             ` The largest shortfall runs the other way: the ${count(below.types)} ${superclassName(below.superclass)} types cost ${percent(below.flow_drop)}, less than the ${percent(below.random_mean)} lost by random sets of that size, so their share of routing is smaller than their share of types.`}
         </p>
@@ -121,7 +121,7 @@ function ClassesView({ data }) {
             height={height}
             margin={margin}
             role="group"
-            label={`Use the arrow keys to move between superclasses. Flow capacity lost when each of ${rows.length} superclasses is removed, compared with random sets of the same size. Highest: ${superclassName(top.superclass)}, ${percent(top.flow_drop)}.`}
+            label={`Use the arrow keys to move between superclasses. Flow capacity lost when each of ${rows.length} superclasses is removed, compared with random sets of the same size. Highest: ${sentence(superclassName(top.superclass))}, ${percent(top.flow_drop)}.`}
             onPointer={(_x, y) => {
               const i = Math.floor(y / rowH);
               setActive(i >= 0 && i < ordered.length ? ordered[i].superclass : null);
@@ -137,7 +137,7 @@ function ClassesView({ data }) {
                   width={w}
                 >
                   <div className="fa-tip">
-                    <strong>{superclassName(activeRow.superclass)}</strong>
+                    <strong>{sentence(superclassName(activeRow.superclass))}</strong>
                     <span className="fa-tip-sub">
                       {count(activeRow.types)} types, {count(activeRow.neurons)} neurons
                     </span>
@@ -189,7 +189,7 @@ function ClassesView({ data }) {
                         className="fa-move fa-focusable"
                         style={{ transform: `translateY(${order[r.superclass] * rowH}px)` }}
                         role="img"
-                        aria-label={`${superclassName(r.superclass)}: ${percent(r.flow_drop)} lost; random sets ${percent(r.random_mean)}; p ${pValue(r.p_value)}`}
+                        aria-label={`${sentence(superclassName(r.superclass))}: ${percent(r.flow_drop)} lost; random sets ${percent(r.random_mean)}; p ${pValue(r.p_value)}`}
                       >
                         <rect
                           className={`fa-band${on ? " is-on" : ""}`}
@@ -206,7 +206,7 @@ function ClassesView({ data }) {
                           dy="0.32em"
                           textAnchor={wide ? "end" : "start"}
                         >
-                          {superclassName(r.superclass)}
+                          {sentence(superclassName(r.superclass))}
                         </text>
                         <line className="fa-track" x1={0} x2={inner.width} y1={dotY} y2={dotY} />
                         <line
@@ -253,7 +253,7 @@ function ClassesView({ data }) {
             <tbody>
               {ordered.map((r) => (
                 <tr key={r.superclass}>
-                  <td>{superclassName(r.superclass)}</td>
+                  <td>{sentence(superclassName(r.superclass))}</td>
                   <td className="num">{count(r.types)}</td>
                   <td className="num">{count(r.neurons)}</td>
                   <td className="num">{percent(r.flow_drop)}</td>

@@ -2,10 +2,11 @@ import { useMemo, useState } from "react";
 import { ChartFrame, Row, Tooltip } from "../Chart.jsx";
 import { Figure, Keynote, Sidenote, TextBlock } from "../ui.jsx";
 import { useWidth } from "../../lib/hooks.js";
-import { count, percent, pValue, superclassName } from "../../lib/format.js";
+import { count, percent, sentence, signedCount, superclassName } from "../../lib/format.js";
 import { linear, niceTicks } from "../../lib/scales.js";
 import { Finding, Pending, useResult } from "./Finding.jsx";
-import { useRovingRows } from "./useRovingRows.js";
+import { PValue } from "./marks.jsx";
+import { coarsePointer, useRovingRows } from "./useRovingRows.js";
 import "../../styles/findings-c.css";
 
 const ID = "bilateral";
@@ -14,28 +15,12 @@ const ALPHA = 0.05;
 const SENSORY = 1;
 
 const CLASSES = [
-  { key: "superadditive", name: "Superadditive", meaning: "both sides together cost more than the two alone" },
-  { key: "additive", name: "Additive", meaning: "the two single-side losses add up exactly" },
-  { key: "subadditive", name: "Subadditive", meaning: "one side alone already costs most of what both carry" },
+  { key: "superadditive", name: "Superadditive", meaning: "Both sides together cost more than the two alone" },
+  { key: "additive", name: "Additive", meaning: "The two single-side losses add up exactly" },
+  { key: "subadditive", name: "Subadditive", meaning: "One side alone already costs most of what both carry" },
 ];
 
 const SIDES = { L: "left", R: "right", M: "on the midline", unknown: "without a recorded side" };
-
-const signed = (value) => (value > 0 ? `+${count(value)}` : count(value));
-
-const coarsePointer = () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
-
-/** A p-value, with a superscript exponent when it is very small and plain words when it underflows. */
-function P({ value }) {
-  if (value === 0) return "below the smallest value double precision can hold";
-  if (value == null || value >= 0.001) return `= ${pValue(value)}`;
-  const [mantissa, exponent] = value.toExponential(1).split("e");
-  return (
-    <>
-      = {mantissa} &times; 10<sup>{String(Number(exponent)).replace("-", "−")}</sup>
-    </>
-  );
-}
 
 export default function Bilateral({ types }) {
   const { data, missing } = useResult("bilateral.json");
@@ -58,7 +43,7 @@ function BilateralView({ data, types }) {
   const sensoryTop = strongest.filter((r) => index.has(r.cell_type) && types.role[index.get(r.cell_type)] === SENSORY).length;
   const describe = (name) => {
     const i = index.get(name);
-    return i == null ? null : superclassName(types.superclasses[types.superclass[i]]);
+    return i == null ? null : sentence(superclassName(types.superclasses[types.superclass[i]]));
   };
 
   return (
@@ -160,7 +145,7 @@ function BilateralView({ data, types }) {
               </span>
               <span className="fc-stats">
                 One-sided Wilcoxon signed-rank test over the {count(single.pairs_differing)} types whose values differ: W ={" "}
-                {count(single.statistic)}, p <P value={single.p_value} />
+                {count(single.statistic)}, <PValue p={single.p_value} />
               </span>
             </dd>
           </div>
@@ -174,7 +159,7 @@ function BilateralView({ data, types }) {
               </span>
               <span className="fc-stats">
                 One-sided Wilcoxon signed-rank test over the {count(sum.pairs_differing)} types whose values differ: W ={" "}
-                {count(sum.statistic)}, p <P value={sum.p_value} />
+                {count(sum.statistic)}, <PValue p={sum.p_value} />
               </span>
             </dd>
           </div>
@@ -198,19 +183,19 @@ function BilateralView({ data, types }) {
 
       <dl className="facts">
         <div>
-          <dt>types with both a left and a right copy</dt>
+          <dt>Types with both a left and a right copy</dt>
           <dd>{count(data.bilateral_types)}</dd>
         </div>
         <div>
-          <dt>of those, types whose removal changes flow capacity</dt>
+          <dt>Of those, types whose removal changes flow capacity</dt>
           <dd>{count(informative)}</dd>
         </div>
         <div>
-          <dt>covered completely by the opposite copy</dt>
+          <dt>Covered completely by the opposite copy</dt>
           <dd>{count(data.fully_insured_types)}</dd>
         </div>
         <div>
-          <dt>routes in the intact hemisphere-resolved graph</dt>
+          <dt>Routes in the intact hemisphere-resolved graph</dt>
           <dd>{count(data.intact_flow)}</dd>
         </div>
       </dl>
@@ -240,7 +225,7 @@ function BilateralView({ data, types }) {
                     <td className="num">{count(r.impact_left)}</td>
                     <td className="num">{count(r.impact_right)}</td>
                     <td className="num">{count(r.impact_both)}</td>
-                    <td className="num">{signed(r.superadditivity)}</td>
+                    <td className="num">{signedCount(r.superadditivity)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -271,7 +256,7 @@ function SuperChart({ rows, describe }) {
         height={height}
         margin={margin}
         role="group"
-        label={`Superadditivity of the ${rows.length} most superadditive cell types, from ${signed(rows[0].superadditivity)} down to ${signed(rows.at(-1).superadditivity)} routes`}
+        label={`Superadditivity of the ${rows.length} most superadditive cell types, from ${signedCount(rows[0].superadditivity)} down to ${signedCount(rows.at(-1).superadditivity)} routes`}
         onPointer={(_x, y) => {
           const i = Math.floor(y / rowH);
           setHover(i >= 0 && i < rows.length ? i : null);
@@ -292,7 +277,7 @@ function SuperChart({ rows, describe }) {
                 <Row label="Left removed" value={count(r.impact_left)} />
                 <Row label="Right removed" value={count(r.impact_right)} />
                 <Row label="Both removed" value={count(r.impact_both)} />
-                <Row label="Superadditivity" value={signed(r.superadditivity)} />
+                <Row label="Superadditivity" value={signedCount(r.superadditivity)} />
               </div>
             </Tooltip>
           );
@@ -352,7 +337,7 @@ function SuperChart({ rows, describe }) {
                     </text>
                     <rect className="fc-bar" x={0} y={barY - 5} width={Math.max(1, end)} height={10} rx={1} />
                     <text className="fc-value" x={end + 6} y={barY} dy="0.32em">
-                      {signed(r.superadditivity)}
+                      {signedCount(r.superadditivity)}
                       <tspan className="fc-value-quiet" dx={6}>
                         {count(r.impact_both)} in all
                       </tspan>

@@ -5,7 +5,7 @@ import { ChartFrame, Row, Tooltip } from "../Chart.jsx";
 import { Figure, Segmented, Sidenote, TextBlock } from "../ui.jsx";
 import { useReducedMotion } from "../../lib/hooks.js";
 import { linear, niceTicks } from "../../lib/scales.js";
-import { count, fixed, pValue } from "../../lib/format.js";
+import { count, fixed, pValue, sentence, signedFixed } from "../../lib/format.js";
 import "../../styles/findings-a.css";
 
 const ID = "null-model";
@@ -151,7 +151,7 @@ function Panel({ strategy, test, samples, significant, metricLabel }) {
         <div>
           <dt>z; p</dt>
           <dd>
-            {fixed(test.z_score, 1)}; {pValue(test.p_value)}
+            {signedFixed(test.z_score, 1)}; {pValue(test.p_value)}
           </dd>
         </div>
       </dl>
@@ -164,7 +164,14 @@ export default function NullModel({ meta }) {
   const [metric, setMetric] = useState("auc_flow");
   const reduced = useReducedMotion();
 
-  if (missing) return <Pending id={ID} title={NEUTRAL_TITLE} />;
+  if (missing) {
+    return (
+      <Pending id={ID} title={NEUTRAL_TITLE}>
+        The ensemble of degree-preserving randomized graphs is still being computed; its design is fixed in{" "}
+        <a href="#methods-validation">Validation</a>.
+      </Pending>
+    );
+  }
   if (!data) return null;
 
   const strategies = meta.strategies.filter((s) => data.strategies[s.id]);
@@ -271,8 +278,8 @@ export default function NullModel({ meta }) {
                   const t = data.strategies[s.id][m.value];
                   return (
                     <tr key={`${m.value}-${s.id}`}>
-                      <td>{s.label}</td>
-                      <td>{m.label.toLowerCase()}</td>
+                      <td>{sentence(s.label)}</td>
+                      <td>{m.label}</td>
                       <td className="num">{fixed(t.real, 3)}</td>
                       <td className="num">{fixed(t.null_mean, 3)}</td>
                       <td className="num">{fixed(t.null_sd, 3)}</td>
@@ -280,7 +287,7 @@ export default function NullModel({ meta }) {
                         {fixed(t.null_min, 3)} to {fixed(t.null_max, 3)}
                       </td>
                       <td className="num">{count(t.n_at_or_below_real)}</td>
-                      <td className="num">{fixed(t.z_score, 2)}</td>
+                      <td className="num">{signedFixed(t.z_score, 2)}</td>
                       <td className="num">{pValue(t.p_value)}</td>
                       <td>{isSignificant(t) ? "Significant" : "Not significant"}</td>
                     </tr>

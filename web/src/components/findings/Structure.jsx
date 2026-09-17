@@ -2,8 +2,8 @@ import { useState } from "react";
 import { ChartFrame, Row, Tooltip, XAxis, YAxis } from "../Chart.jsx";
 import { Figure, Keynote, Segmented, Sidenote, TextBlock } from "../ui.jsx";
 import { Finding, Pending, useResult } from "./Finding.jsx";
-import { LogAxes, PValue, Pow, minorTicks } from "./marks.jsx";
-import { count, fixed, percent, superclassName } from "../../lib/format.js";
+import { ALTERNATIVES, LogAxes, PValue, Pow, minorTicks, verdict } from "./marks.jsx";
+import { count, fixed, percent, sentence, signedFixed } from "../../lib/format.js";
 import { useWidth } from "../../lib/hooks.js";
 import { line, linear, log, logTicks } from "../../lib/scales.js";
 import "../../styles/findings-b.css";
@@ -11,20 +11,14 @@ import "../../styles/findings-b.css";
 const ID = "structure";
 const TITLE = "The shape of the graph";
 const MEASURES = [
-  { value: "out-strength", label: "Out-strength", unit: "Output synapses", short: "synapses" },
+  { value: "out-strength", label: "Weighted out-degree", unit: "Output synapses", short: "synapses" },
   { value: "out-degree", label: "Out-degree", unit: "Target cell types", short: "partner types" },
   { value: "in-degree", label: "In-degree", unit: "Input cell types", short: "partner types" },
 ];
-const ALTERNATIVES = {
-  exponential: "an exponential",
-  lognormal: "a lognormal",
-  truncated_power_law: "a truncated power law",
-};
 const SIGNIFICANCE = 0.05;
 const TIP_HALF = 120;
 
 const smallPercent = (v) => (v >= 0.01 ? percent(v, 0) : v >= 0.001 ? percent(v, 1) : percent(v, 2));
-const bare = (name) => name.slice(name.indexOf(" ") + 1);
 
 function joinWords(items) {
   if (items.length < 2) return items.join("");
@@ -46,12 +40,12 @@ function compare(tail) {
   return { better, tied, worse };
 }
 
-/** The distribution the likelihood-ratio tests favour for one tail, in words. */
-function favoured(tail) {
+/** The distribution the likelihood-ratio tests favor for one tail, in words. */
+function favored(tail) {
   const { better, tied } = compare(tail);
-  if (better.length) return `favours ${joinWords(better)} over a pure power law`;
+  if (better.length) return `favors ${joinWords(better)} over a pure power law`;
   if (tied.length) return `cannot tell a power law from ${joinWords(tied)}`;
-  return "favours a power law over every alternative";
+  return "favors a power law over every alternative";
 }
 
 const strengthWord = (rho) => {
@@ -80,14 +74,11 @@ function StructureView({ data, percolation }) {
   const verdicts = strength ? compare(strength) : null;
   const deepShare = data.types_in_deepest_core / data.types;
   const rho = data.coreness_vs_out_strength;
-  const classes = [...(data.superclass_impact ?? [])].sort((a, b) => b.flow_drop - a.flow_drop);
-  const topClass = classes[0];
   const ranked = Object.entries(percolation?.strategies ?? {})
     .filter(([id, s]) => id !== "random" && s.critical_fraction != null)
     .sort((a, b) => a[1].critical_fraction - b[1].critical_fraction);
   const strengthFirst = ranked[0]?.[0] === "out_strength";
   const weak = Math.abs(rho.spearman_rho) < 0.3;
-  const aboveRandom = classes.filter((c) => c.p_value < SIGNIFICANCE && c.excess_over_random > 0);
 
   return (
     <Finding
@@ -116,11 +107,12 @@ function StructureView({ data, percolation }) {
           <p>
             {strengthFirst
               ? "The ranking that halves flow soonest orders cell types by how many synapses they send, and that quantity is extremely uneven."
-              : "One of the rankings orders cell types by how many synapses they send, and that quantity is extremely uneven."} The median type makes {count(strength.median)} output synapses; the largest makes{" "}
+              : "One of the rankings orders cell types by how many synapses they send, and that quantity is extremely uneven."}{" "}
+            The median type makes {count(strength.median)} output synapses; the largest makes{" "}
             {count(strength.max)}. Only {count(strength.n_tail)} of {count(strength.n)} types (
-            {percent(strength.n_tail / strength.n)}) send at least {count(strength.xmin)}. A ranking by out-strength
-            removes those few types first, and each takes far more synapses with it than a type picked at random, which
-            almost always comes from the bulk of the distribution.
+            {percent(strength.n_tail / strength.n)}) send at least {count(strength.xmin)}. A ranking by weighted
+            out-degree removes those few types first, and each takes far more synapses with it than a type picked at
+            random, which almost always comes from the bulk of the distribution.
           </p>
         )}
         {strength && verdicts && (
@@ -146,7 +138,8 @@ function StructureView({ data, percolation }) {
         <p>
           Peeling the undirected graph into k-cores ends at k = {data.max_coreness}, and{" "}
           {count(data.types_in_deepest_core)} of {count(data.types)} types belong to that deepest core
-          {deepShare > 0.5 ? ": most of the graph is one densely interconnected block with thin shells around it." : "."} Coreness and out-strength
+          {deepShare > 0.5 ? ": most of the graph is one densely interconnected block with thin shells around it." : "."}{" "}
+          Coreness and weighted out-degree
           {rho.spearman_rho >= 0 ? " rise together" : " move in opposite directions"}
           {weak ? " only" : ""} {strengthWord(rho.spearman_rho)} (Spearman rho = {fixed(rho.spearman_rho)})
           {weak
@@ -162,32 +155,24 @@ function StructureView({ data, percolation }) {
           caption={
             <>
               Both axes are logarithmic. The solid line is the share of cell types with at least each value; the dashed
-              line is the power law fitted from the start of the shaded tail. The likelihood-ratio tests below say
-              which distribution the tail favours.
+              line is the power law fitted from the start of the shaded tail. The likelihood-ratio tests listed under
+              the chart say which distribution the tail favors.
             </>
           }
         >
           <TailChart measure={current} />
-          <p className="fb-favoured">
-            The {current.label.toLowerCase()} tail {favoured(current.tail)}.
+          <p className="fb-favored">
+            The {current.label.toLowerCase()} tail {favored(current.tail)}.
           </p>
           <ul className="fb-verdicts">
             {Object.entries(ALTERNATIVES).map(([id, name]) => {
               const c = current.tail.comparisons?.[id];
               if (!c) return null;
-              let text = `Power law and ${bare(name)} fit equally well`;
-              if (c.p_value < SIGNIFICANCE) {
-                text =
-                  c.loglikelihood_ratio > 0
-                    ? `Power law fits better than ${name}`
-                    : `${name[0].toUpperCase()}${name.slice(1)} fits better than a power law`;
-              }
               return (
                 <li key={id}>
-                  <span>{text}</span>
+                  <span>{verdict(c, name, SIGNIFICANCE)}</span>
                   <span className="fb-stat">
-                    R = {c.loglikelihood_ratio > 0 ? "+" : ""}
-                    {fixed(c.loglikelihood_ratio)}, <PValue p={c.p_value} />
+                    R = {signedFixed(c.loglikelihood_ratio)}, <PValue p={c.p_value} />
                   </span>
                 </li>
               );
@@ -209,26 +194,6 @@ function StructureView({ data, percolation }) {
         </Figure>
       </div>
 
-      {topClass && (
-        <TextBlock
-          notes={
-            <Keynote value={percent(topClass.flow_drop)}>
-              of flow capacity lost when all {count(topClass.types)} {superclassName(topClass.superclass)} types are
-              removed; random sets of the same size lose {percent(topClass.random_mean)}
-            </Keynote>
-          }
-        >
-          <p>
-            Removing whole superclasses tests whether routing depends on particular kinds of neuron more than on their
-            number. Taking out the {count(topClass.types)} {superclassName(topClass.superclass)} types costs{" "}
-            {percent(topClass.flow_drop)} of flow capacity, where {count(data.random_draws)} random sets of the same size
-            cost {percent(topClass.random_mean)} on average. {count(aboveRandom.length)} of {count(classes.length)}{" "}
-            superclasses with at least {count(data.superclass_threshold)} types lose more than their random sets at p
-            &lt; {SIGNIFICANCE}; every superclass is compared in <a href="#classes">Losing a class</a>.
-          </p>
-        </TextBlock>
-      )}
-
       <details className="more">
         <summary>Tail fits as a table</summary>
         <div className="table-wrap">
@@ -247,9 +212,9 @@ function StructureView({ data, percolation }) {
               </tr>
             </thead>
             <tbody>
-              {tails.map(({ value, tail }) => (
+              {tails.map(({ value, label, tail }) => (
                 <tr key={value}>
-                  <td>{tail.measure}</td>
+                  <td>{label}</td>
                   <td className="num">{count(tail.n)}</td>
                   <td className="num">{count(tail.median)}</td>
                   <td className="num">{count(tail.max)}</td>
@@ -257,7 +222,7 @@ function StructureView({ data, percolation }) {
                   <td className="num">{count(tail.xmin)}</td>
                   <td className="num">{count(tail.n_tail)}</td>
                   <td className="num">{fixed(tail.ks_distance, 3)}</td>
-                  <td>{favoured(tail)}</td>
+                  <td>{sentence(favored(tail))}</td>
                 </tr>
               ))}
             </tbody>

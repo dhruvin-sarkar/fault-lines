@@ -13,10 +13,6 @@
   font-variation-settings: "opsz" 48;
 }
 
-.ms sub {
-  line-height: 0;
-}
-
 /* Toy network */
 .ms-actions {
   display: flex;

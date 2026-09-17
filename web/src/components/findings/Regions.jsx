@@ -1,23 +1,24 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Finding } from "./Finding.jsx";
-import { useRovingRows } from "./useRovingRows.js";
+import { coarsePointer, useRovingRows } from "./useRovingRows.js";
 import Atlas, { atlasAspect } from "../Atlas.jsx";
 import { ChartFrame, Row, Tooltip } from "../Chart.jsx";
 import { Figure, Segmented, Sidenote, TextBlock } from "../ui.jsx";
 import { useData } from "../../lib/data.js";
 import { useReducedMotion, useTokens } from "../../lib/hooks.js";
 import { linear, niceTicks } from "../../lib/scales.js";
-import { count, percent, pValue } from "../../lib/format.js";
+import { count, percent, pValue, sentence } from "../../lib/format.js";
 import "../../styles/findings-a.css";
 
 const ID = "regions";
 const TITLE = "Where it hurts";
 const TOP = 20;
 const ROW = 26;
+const TOUCH_ROW = 40;
 const SIGNIFICANCE = 0.05;
 const SORTS = [
   { value: "flow_drop", label: "Flow lost" },
-  { value: "excess", label: "Above random" },
+  { value: "excess", label: "Difference from random" },
 ];
 
 const NEUROPILS = {
@@ -119,7 +120,7 @@ function fieldRamp(glow) {
 }
 
 function RegionTip({ region, rank, total }) {
-  const description = describe(region.neuropil);
+  const description = sentence(describe(region.neuropil));
   return (
     <div className="fa-tip">
       <strong>
@@ -176,7 +177,13 @@ function RegionsView({ types, atlas, regions }) {
   const gradient = tokens["signal-glow"]
     ? [0, 0.25, 0.5, 0.75, 1].map((t) => `${ramp(t)} ${t * 100}%`).join(", ")
     : null;
-  const regionLabel = (r) => (describe(r.neuropil) ? `the ${describe(r.neuropil)} (${r.neuropil})` : r.neuropil);
+  const regionLabel = (r) => {
+    const base = NEUROPILS[r.neuropil.split("(")[0]];
+    if (!base) return r.neuropil;
+    const side = r.neuropil.endsWith("(L)") ? "left " : r.neuropil.endsWith("(R)") ? "right " : "";
+    const segment = r.neuropil.match(/T[123]/)?.[0];
+    return `the ${side}${base}${segment ? `, ${SEGMENTS[segment]}` : ""} (${r.neuropil.replace(/\((L|R)\)$/, "")})`;
+  };
 
   function onMap(outline, event) {
     if (!outline || !byName[outline.neuropil] || !event) {
@@ -191,15 +198,16 @@ function RegionsView({ types, atlas, regions }) {
     listed.map((r) => r.neuropil),
     (name) => setActive(name ? { name, source: "bars" } : null),
   );
+  const row = coarsePointer() ? TOUCH_ROW : ROW;
   const margin = { top: 26, right: 12, bottom: 40, left: 118 };
-  const barHeight = TOP * ROW + margin.top + margin.bottom;
+  const barHeight = TOP * row + margin.top + margin.bottom;
 
   return (
     <Finding
       id={ID}
       title={TITLE}
       stat={percent(top.flow_drop)}
-      statLabel={`of flow capacity lost when the ${count(top.types)} cell types anchored in ${top.neuropil} are removed`}
+      statLabel={`of flow capacity lost when the ${count(top.types)} cell types anchored in ${regionLabel(top)} are removed`}
     >
       <TextBlock
         notes={
@@ -221,9 +229,11 @@ function RegionsView({ types, atlas, regions }) {
           {percent(top.flow_drop)} of flow capacity, against {percent(top.random_mean)} for random sets of that size.
         </p>
         <p>
-          {above.length} of {regions.length} neuropils lose more than their random sets at p &lt; {SIGNIFICANCE},
-          uncorrected. The largest excess over random belongs to {regionLabel(topExcess)}, at{" "}
-          {percent(topExcess.flow_drop)} against {percent(topExcess.random_mean)}.
+          Of the {regions.length} neuropils, {above.length} lose more than their random sets at p &lt; {SIGNIFICANCE},
+          uncorrected.
+          {topExcess === top
+            ? ` No other neuropil exceeds its random sets by as much as ${topName ? `the ${topName}` : top.neuropil}.`
+            : ` The largest excess over random belongs to ${regionLabel(topExcess)}, at ${percent(topExcess.flow_drop)} against ${percent(topExcess.random_mean)}.`}
           {excess(below) < 0 &&
             ` At the other end, removing ${regionLabel(below)} costs ${percent(below.flow_drop)}, less than the ${percent(below.random_mean)} lost by random sets of its size.`}
         </p>
@@ -236,12 +246,12 @@ function RegionsView({ types, atlas, regions }) {
         controls={<Segmented label="Rank neuropils by" options={SORTS} value={sort} onChange={setSort} />}
         caption={
           <>
-            Left, the male central nervous system with brain above and nerve cord below; each neuropil glows by the
-            share of flow capacity lost when its anchored types are removed, on a square-root scale so small regions stay
-            distinct. Points are cell types.{unscored > 0 && " Neuropils without a score stay dark."} Right, the{" "}
-            {TOP} neuropils with the largest {sort === "flow_drop" ? "loss" : "loss above random"}; the white tick is
-            the mean loss of same-size random sets and its whisker one standard deviation. Hover either side to find
-            the same neuropil in the other, or focus the list and use the arrow keys.
+            The map shows the male central nervous system with brain above and nerve cord below; each neuropil glows
+            by the share of flow capacity lost when its anchored types are removed, on a square-root scale so small
+            regions stay distinct. Points are cell types.{unscored > 0 && " Neuropils without a score stay dark."} The
+            bars rank the {TOP} neuropils with the largest {sort === "flow_drop" ? "loss" : "loss above random"}; the
+            white tick is the mean loss of same-size random sets and its whisker one standard deviation. Hover the map
+            or the bars to find the same neuropil in the other, or focus the bars and use the arrow keys.
           </>
         }
       >
@@ -269,7 +279,7 @@ function RegionsView({ types, atlas, regions }) {
                 <div
                   className="fa-ramp"
                   role="img"
-                  aria-label={`Colour scale from 0% to ${percent(max)} of flow capacity lost, square-root scaled`}
+                  aria-label={`Color scale from 0% to ${percent(max)} of flow capacity lost, square-root scaled`}
                 >
                   <span>0%</span>
                   <span className="fa-ramp-bar" style={{ background: `linear-gradient(to right, ${gradient})` }} />
@@ -292,7 +302,7 @@ function RegionsView({ types, atlas, regions }) {
               role="group"
               label={`Use the arrow keys to move between neuropils. Top ${TOP} neuropils by ${sort === "flow_drop" ? "flow capacity lost" : "loss above same-size random sets"}, each with the random-set mean and standard deviation.`}
               onPointer={(_x, y) => {
-                const i = Math.floor(y / ROW);
+                const i = Math.floor(y / row);
                 if (i >= 0 && i < listed.length) setActive({ name: listed[i].neuropil, source: "bars" });
                 else setActive(null);
               }}
@@ -302,7 +312,7 @@ function RegionsView({ types, atlas, regions }) {
                 const scale = linear([0, xMax], [0, w - m.left - m.right]);
                 const r = listed[activeRow];
                 return (
-                  <Tooltip x={m.left + scale(Math.max(r.flow_drop, r.random_mean))} y={m.top + activeRow * ROW + 4} width={w}>
+                  <Tooltip x={m.left + scale(Math.max(r.flow_drop, r.random_mean))} y={m.top + activeRow * row + 4} width={w}>
                     <RegionTip region={r} rank={rankOf(r.neuropil)} total={ranked.length} />
                   </Tooltip>
                 );
@@ -332,7 +342,7 @@ function RegionsView({ types, atlas, regions }) {
                           key={r.neuropil}
                           {...rowProps(r.neuropil)}
                           className="fa-move fa-focusable"
-                          style={{ transform: `translateY(${i * ROW}px)` }}
+                          style={{ transform: `translateY(${i * row}px)` }}
                           role="img"
                           aria-label={`${r.neuropil}: ${percent(r.flow_drop)} lost; random sets ${percent(r.random_mean)}; p ${pValue(r.p_value)}`}
                         >
@@ -341,22 +351,22 @@ function RegionsView({ types, atlas, regions }) {
                             x={-margin.left + 2}
                             width={inner.width + margin.left + margin.right - 4}
                             y={1}
-                            height={ROW - 2}
+                            height={row - 2}
                             rx={3}
                           />
-                          <text className="fa-row-label" x={-10} y={ROW / 2} dy="0.32em" textAnchor="end">
+                          <text className="fa-row-label" x={-10} y={row / 2} dy="0.32em" textAnchor="end">
                             {r.neuropil}
                           </text>
-                          <rect x={0} y={ROW / 2 - 6} width={Math.max(1, x(r.flow_drop))} height={12} rx={1} style={{ fill: shade(r.flow_drop) }} />
+                          <rect x={0} y={row / 2 - 6} width={Math.max(1, x(r.flow_drop))} height={12} rx={1} style={{ fill: shade(r.flow_drop) }} />
                           <path
-                            d={`M${x(Math.max(0, r.random_mean - r.random_sd))} ${ROW / 2}H${x(r.random_mean + r.random_sd)}M${x(r.random_mean)} ${ROW / 2 - 8}V${ROW / 2 + 8}`}
+                            d={`M${x(Math.max(0, r.random_mean - r.random_sd))} ${row / 2}H${x(r.random_mean + r.random_sd)}M${x(r.random_mean)} ${row / 2 - 8}V${row / 2 + 8}`}
                             style={{ stroke: "var(--field)", strokeWidth: 4, opacity: 0.7 }}
                           />
                           <path
-                            d={`M${x(Math.max(0, r.random_mean - r.random_sd))} ${ROW / 2}H${x(r.random_mean + r.random_sd)}`}
+                            d={`M${x(Math.max(0, r.random_mean - r.random_sd))} ${row / 2}H${x(r.random_mean + r.random_sd)}`}
                             style={{ stroke: "var(--field-ink-2)", strokeWidth: 1.25 }}
                           />
-                          <path d={`M${x(r.random_mean)} ${ROW / 2 - 8}V${ROW / 2 + 8}`} style={{ stroke: "var(--field-ink)", strokeWidth: 2 }} />
+                          <path d={`M${x(r.random_mean)} ${row / 2 - 8}V${row / 2 + 8}`} style={{ stroke: "var(--field-ink)", strokeWidth: 2 }} />
                         </g>
                       );
                     })}
@@ -391,7 +401,7 @@ function RegionsView({ types, atlas, regions }) {
                   <td>
                     <span className="id">{r.neuropil}</span>
                   </td>
-                  <td>{describe(r.neuropil) ?? ""}</td>
+                  <td>{sentence(describe(r.neuropil)) ?? ""}</td>
                   <td className="num">{count(r.types)}</td>
                   <td className="num">{count(r.sensory)}</td>
                   <td className="num">{count(r.motor)}</td>

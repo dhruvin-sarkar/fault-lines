@@ -3,10 +3,10 @@ import Atlas, { FIELD_LIVE, atlasAspect } from "../Atlas.jsx";
 import { ChartFrame, Row, Tooltip } from "../Chart.jsx";
 import { Figure, Keynote, Segmented, Sidenote, TextBlock } from "../ui.jsx";
 import { useWidth } from "../../lib/hooks.js";
-import { count, superclassName } from "../../lib/format.js";
+import { count, sentence, signedCount, superclassName } from "../../lib/format.js";
 import { linear, niceTicks } from "../../lib/scales.js";
 import { Finding, Pending, useResult } from "./Finding.jsx";
-import { useRovingRows } from "./useRovingRows.js";
+import { activateOr, coarsePointer, useRovingRows } from "./useRovingRows.js";
 import "../../styles/findings-c.css";
 
 const ID = "pairs";
@@ -18,19 +18,7 @@ const MAP_MODES = [
   { value: "pair", label: "Selected pair" },
 ];
 
-const signed = (value) => (value > 0 ? `+${count(value)}` : count(value));
-
 const pairKey = (p) => `${p.type_a}|${p.type_b}`;
-
-/** Enter and Space activate a row; every other key goes to the row's own handler. */
-function activateOr(event, activate, otherwise) {
-  if (event.key === "Enter" || event.key === " ") {
-    event.preventDefault();
-    activate();
-  } else otherwise(event);
-}
-
-const coarsePointer = () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
 
 /**
  * The candidate pool rebuilt from the type table: types ranked by flow lost per partner edge.
@@ -78,9 +66,9 @@ function PairsView({ data, types, atlas }) {
   const pairSet = new Set([pair.type_a, pair.type_b].filter((n) => index.has(n)).map((n) => index.get(n)));
   const describe = (name) => {
     const i = index.get(name);
-    if (i == null) return "not in the type table";
+    if (i == null) return "Not in the type table";
     const anchor = types.anchor[i] >= 0 ? `, mostly in ${types.anchors[types.anchor[i]]}` : "";
-    return `${superclassName(types.superclasses[types.superclass[i]])}${anchor}`;
+    return `${sentence(superclassName(types.superclasses[types.superclass[i]]))}${anchor}`;
   };
 
   return (
@@ -115,7 +103,7 @@ function PairsView({ data, types, atlas }) {
         </p>
         <p>
           Every pair among {count(data.pool_size)} candidate types was removed together, {count(data.pairs_evaluated)}{" "}
-          pairs in all. {count(data.pairs_with_positive_synergy)} cost more than their two single losses,{" "}
+          pairs in all. Of these, {count(data.pairs_with_positive_synergy)} cost more than their two single losses,{" "}
           {count(data.pairs_with_negative_synergy)} cost less, and the other {count(additive)} are exactly additive. The
           largest excess is {count(data.max_synergy)} routes of {count(data.intact_flow)}, for{" "}
           <span className="id">{top.type_a}</span> and <span className="id">{top.type_b}</span>.
@@ -124,7 +112,7 @@ function PairsView({ data, types, atlas }) {
           Those pairs are not the ones the search was built to find.{" "}
           {poolSensory != null && (
             <>
-              {count(poolSensory)} of the {count(data.pool_size)} candidates are sensory types, and every pair with
+              Of the {count(data.pool_size)} candidates, {count(poolSensory)} are sensory types, and every pair with
               positive synergy joins two of them, as do{" "}
               {sensoryPairs === pairs.length ? `all ${count(pairs.length)}` : `${count(sensoryPairs)} of the ${count(pairs.length)}`}{" "}
               strongest pairs below.{" "}
@@ -167,8 +155,8 @@ function PairsView({ data, types, atlas }) {
           }
           caption={
             mode === "pool" && pool
-              ? "The male central nervous system, brain above and nerve cord below, one point per cell type. Candidate types glow red."
-              : "The male central nervous system, brain above and nerve cord below, one point per cell type. The two types of the selected pair glow red."
+              ? "The male central nervous system, brain above and nerve cord below, one point per cell type. Candidate types are drawn in white."
+              : "The male central nervous system, brain above and nerve cord below, one point per cell type. The two types of the selected pair are drawn in white."
           }
         >
           <div className="fc-map" style={{ aspectRatio: `${aspect}`, maxWidth: `calc(40rem * ${aspect})` }}>
@@ -188,15 +176,15 @@ function PairsView({ data, types, atlas }) {
           <div className="fc-map-key" aria-hidden="true">
             <span>
               <svg width="10" height="10" viewBox="-5 -5 10 10">
-                <rect x="-3" y="-3" width="6" height="6" style={{ fill: "var(--signal-glow)" }} />
+                <rect x="-3" y="-3" width="6" height="6" style={{ fill: "var(--field-ink)" }} />
               </svg>
-              {mode === "pool" && pool ? "candidate type" : "selected pair"}
+              {mode === "pool" && pool ? "Candidate types" : "Selected pair"}
             </span>
             <span>
               <svg width="10" height="10" viewBox="-5 -5 10 10">
                 <rect x="-2" y="-2" width="4" height="4" style={{ fill: `var(--field-live, ${FIELD_LIVE})`, opacity: 0.6 }} />
               </svg>
-              other cell types
+              Other cell types
             </span>
           </div>
           <div className="fc-readout" aria-live="polite">
@@ -222,7 +210,7 @@ function PairsView({ data, types, atlas }) {
                 </span>
                 <span>
                   Alone they cost {count(pair.impact_a)} and {count(pair.impact_b)} routes; together{" "}
-                  {count(pair.joint_impact)}, a synergy of {signed(pair.synergy)}.
+                  {count(pair.joint_impact)}, a synergy of {signedCount(pair.synergy)}.
                 </span>
               </>
             )}
@@ -232,19 +220,19 @@ function PairsView({ data, types, atlas }) {
 
       <dl className="facts">
         <div>
-          <dt>pairs tested, every pair among {count(data.pool_size)} candidates</dt>
+          <dt>Pairs tested, every pair among {count(data.pool_size)} candidates</dt>
           <dd>{count(data.pairs_evaluated)}</dd>
         </div>
         <div>
-          <dt>cost more together than their two single losses</dt>
+          <dt>Cost more together than their two single losses</dt>
           <dd>{count(data.pairs_with_positive_synergy)}</dd>
         </div>
         <div>
-          <dt>cost less, because the two losses overlap</dt>
+          <dt>Cost less, because the two losses overlap</dt>
           <dd>{count(data.pairs_with_negative_synergy)}</dd>
         </div>
         <div>
-          <dt>exactly additive</dt>
+          <dt>Exactly additive</dt>
           <dd>{count(additive)}</dd>
         </div>
       </dl>
@@ -276,7 +264,7 @@ function PairsView({ data, types, atlas }) {
                   <td className="num">{count(p.impact_a)}</td>
                   <td className="num">{count(p.impact_b)}</td>
                   <td className="num">{count(p.joint_impact)}</td>
-                  <td className="num">{signed(p.synergy)}</td>
+                  <td className="num">{signedCount(p.synergy)}</td>
                   <td className="num">{count(p.flow_after)}</td>
                 </tr>
               ))}
@@ -309,7 +297,7 @@ function PairChart({ rows, selected, onSelect }) {
         height={height}
         margin={margin}
         role="group"
-        label={`Synergy of the ${rows.length} strongest pairs of cell types, from ${signed(rows[0].synergy)} down to ${signed(rows.at(-1).synergy)} routes`}
+        label={`Synergy of the ${rows.length} strongest pairs of cell types, from ${signedCount(rows[0].synergy)} down to ${signedCount(rows.at(-1).synergy)} routes`}
         onPointer={(_x, y) => {
           const i = Math.floor(y / rowH);
           setHover(i >= 0 && i < rowsRef.current.length ? i : null);
@@ -328,7 +316,7 @@ function PairChart({ rows, selected, onSelect }) {
                 <Row label={`${r.type_a} alone`} value={count(r.impact_a)} />
                 <Row label={`${r.type_b} alone`} value={count(r.impact_b)} />
                 <Row label="Both together" value={count(r.joint_impact)} />
-                <Row label="Synergy" value={signed(r.synergy)} />
+                <Row label="Synergy" value={signedCount(r.synergy)} />
                 <Row label="Routes left" value={count(r.flow_after)} />
               </div>
             </Tooltip>
@@ -400,7 +388,7 @@ function PairChart({ rows, selected, onSelect }) {
                       rx={1}
                     />
                     <text className="fc-value" x={end + 6} y={barY} dy="0.32em">
-                      {signed(r.synergy)}
+                      {signedCount(r.synergy)}
                       <tspan className="fc-value-quiet" dx={6}>
                         {count(r.joint_impact)} in all
                       </tspan>

@@ -2,6 +2,17 @@ import { useRef, useState } from "react";
 
 const STEPS = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
 
+/** True on touch-first devices, where chart rows need taller targets. */
+export const coarsePointer = () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+
+/** Enter and Space activate a row; every other key goes to the row's own handler. */
+export function activateOr(event, activate, otherwise) {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    activate();
+  } else otherwise(event);
+}
+
 /**
  * One tab stop for a list of chart rows. Arrow keys move between rows, Home and End jump to the ends,
  * and focusing a row makes it the active one so its tooltip shows. Returns props to spread on each row.

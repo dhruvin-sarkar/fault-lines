@@ -3,7 +3,7 @@ import Atlas, { atlasAspect } from "./Atlas.jsx";
 import { ChartFrame, Row, Tooltip, XAxis, YAxis, spreadLabels } from "./Chart.jsx";
 import { Figure, Segmented, Sidenote, Slider, TextBlock } from "./ui.jsx";
 import { useInView, useReducedMotion, useTokens, useWidth } from "../lib/hooks.js";
-import { count, fixed, percent, valueAt } from "../lib/format.js";
+import { count, fixed, numberWord, percent, sentence, valueAt } from "../lib/format.js";
 import { band, line, linear } from "../lib/scales.js";
 import "../styles/collapse.css";
 
@@ -33,10 +33,6 @@ const METRICS = {
 
 const WIDE_MARGIN = { top: 32, right: 176, bottom: 46, left: 54 };
 const NARROW_MARGIN = { top: 32, right: 12, bottom: 42, left: 40 };
-const NUMBER_WORDS = ["none", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
-
-const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
-const numberWord = (n) => NUMBER_WORDS[n] ?? String(n);
 
 /** Removal fraction where a normalized series first drops below one half, interpolated; null if it never does. */
 function halfCrossing(fractions, values) {
@@ -62,7 +58,7 @@ function halvedSentence(halved, total, noun) {
   const totalWord = numberWord(total);
   if (halved === 0) return `None of the ${totalWord} attacks has halved ${noun}.`;
   if (halved === total) return `All ${totalWord} attacks have halved ${noun}.`;
-  const word = capitalize(numberWord(halved));
+  const word = sentence(numberWord(halved));
   return `${word} of the ${totalWord} attacks ${halved === 1 ? "has" : "have"} halved ${noun}.`;
 }
 
@@ -127,7 +123,7 @@ export default function Collapse({ meta, percolation, types, atlas }) {
         return {
           id,
           label,
-          name: capitalize(label),
+          name: sentence(label),
           color: `var(--glow-${id})`,
           values,
           auc: s[m.auc],
@@ -177,7 +173,6 @@ export default function Collapse({ meta, percolation, types, atlas }) {
   const random = series.find((s) => s.trials);
   const total = strategies.length;
   const totalWord = numberWord(total);
-  const stepShare = percent(meta.protocol.batch_fraction_of_remaining, 0);
   const dim = (id) => focus !== "all" && focus !== id;
 
   useEffect(() => {
@@ -312,7 +307,7 @@ export default function Collapse({ meta, percolation, types, atlas }) {
   return (
     <section className="section" id="collapse" aria-labelledby="collapse-title">
       <div className="wrap">
-        <Intro meta={meta} percolation={percolation} flowSeries={model.flow} />
+        <Intro meta={meta} percolation={percolation} flowSeries={model.flow} pairsSeries={model.pairs} />
 
         <Figure
           id="collapse-race"
@@ -321,8 +316,9 @@ export default function Collapse({ meta, percolation, types, atlas }) {
           controls={controls}
           caption={
             <>
-              Each map is the nervous system at the current step under one strategy, one square per cell type at its place
-              in the brain and nerve cord. Types removed in earlier steps are no longer drawn, and grey squares are types still present but cut off from every sensory type.
+              Each map is the nervous system at the current step under one strategy, one square per cell type at its
+              place in the brain and nerve cord. Types removed in earlier steps are no longer drawn, and gray squares are
+              types still present but cut off from every sensory type.
               {avalanche && avalanche.size > 1000
                 ? ` The largest single step, under ${avalanche.label} at ${percent(avalanche.fraction)} removed, cuts ${count(avalanche.size)} cell types off from sensory input at once.`
                 : ""}
@@ -337,7 +333,7 @@ export default function Collapse({ meta, percolation, types, atlas }) {
               label="Follow a strategy"
               options={[
                 { value: "all", label: `All ${totalWord}` },
-                ...strategies.map(({ id, label }) => ({ value: id, label: capitalize(label), color: `var(--glow-${id})` })),
+                ...strategies.map(({ id, label }) => ({ value: id, label: sentence(label), color: `var(--glow-${id})` })),
               ]}
               value={focus}
               onChange={setFocus}
@@ -429,7 +425,7 @@ export default function Collapse({ meta, percolation, types, atlas }) {
                         />
                         <line className="race-half" x1={0} x2={inner.width} y1={y(0.5)} y2={y(0.5)} />
                         <text className="race-half-label" x={inner.width - 4} y={y(0.5) - 7} textAnchor="end">
-                          half
+                          Half of intact
                         </text>
 
                         <g clipPath={`url(#${clipId})`}>
@@ -549,9 +545,9 @@ export default function Collapse({ meta, percolation, types, atlas }) {
               </div>
 
               <p className="caption race-chart-caption">
-                Each line is the share of the intact value still standing as cell types are removed, {stepShare} of those
-                left at each step; the vertical line is the current step. Rings on the half line mark where each attack
-                halves the measure. The grey band spans the lowest and highest value across {randomTrials} random removal
+                Each line is the share of the intact value still standing as cell types are removed; the vertical line is
+                the current step. Rings on the half line mark where each attack
+                halves the measure. The gray band spans the lowest and highest value across {randomTrials} random removal
                 orders, the dashed line is one of them, and the short bar on the half line is the 95% confidence interval
                 of the random halving point. Click the chart or drag the slider to move to any step.
               </p>
@@ -673,7 +669,7 @@ const MapCell = memo(function MapCell({ id, label, types, atlas, batch, delay, a
       <p className="label">
         <span className="race-multiple-name">
           <span className="swatch" style={{ background: `var(--glow-${id})` }} />
-          {capitalize(label)}
+          {sentence(label)}
         </span>
       </p>
       <div className="canvas-box" style={{ aspectRatio: aspect }}>
@@ -703,44 +699,34 @@ const MapCell = memo(function MapCell({ id, label, types, atlas, batch, delay, a
   );
 });
 
-/** Section heading and the prose that introduces the race, with notes defining the halving point and AUC. */
-const Intro = memo(function Intro({ meta, percolation, flowSeries }) {
+/** Section heading and the prose that introduces the race, with notes on the random baseline. */
+const Intro = memo(function Intro({ meta, percolation, flowSeries, pairsSeries }) {
   const totalWord = numberWord(meta.strategies.length);
-  const stepShare = percent(meta.protocol.batch_fraction_of_remaining, 0);
-  const [aucFrom, aucTo] = meta.protocol.auc_range;
   const fastest = flowSeries.filter((s) => !s.trials).sort((a, b) => a.halvedAt - b.halvedAt)[0];
   const randomFlow = flowSeries.find((s) => s.trials);
-  const randomTrials = randomFlow && percolation.strategies[randomFlow.id].trials;
+  const randomPairs = pairsSeries.find((s) => s.id === randomFlow.id);
+  const randomTrials = percolation.strategies[randomFlow.id].trials;
   return (
     <div className="section-head">
-      <h2 id="collapse-title">{capitalize(totalWord)} ways to take it apart</h2>
+      <h2 id="collapse-title">{sentence(totalWord)} ways to take it apart</h2>
       <TextBlock
         notes={
           <>
-            <Sidenote
-              title={
-                <>
-                  Halving point, <i>f</i>
-                  <sub>c</sub>
-                </>
-              }
-            >
-              The share of cell types removed when flow capacity first falls below half of its intact{" "}
-              {count(percolation.intact_flow)} routes, interpolated between steps. For random removal it is the mean
-              over {randomTrials} orders.
+            <Sidenote title="Random baseline">
+              Random removal is run {randomTrials} times in different orders. Flow capacity halves at{" "}
+              {percent(randomFlow.halvedAt)} on average
+              {randomFlow.ci ? ` (95% CI ${percent(randomFlow.ci[0])} to ${percent(randomFlow.ci[1])})` : ""}.
             </Sidenote>
-            <Sidenote title="Area under the curve (AUC)">
-              The area under a curve from {percent(aucFrom, 0)} to {percent(aucTo, 0)} removed, divided by that
-              range. A measure that never dropped would score 1; lower means the network gives way sooner. Random
-              removal scores {fixed(randomFlow.auc, 3)} on flow capacity.
+            <Sidenote title="Area under the curve">
+              Random removal scores {fixed(randomFlow.auc, 3)} on flow capacity and {fixed(randomPairs.auc, 3)} on
+              reachable pairs. The table after the figure gives both for every strategy.
             </Sidenote>
           </>
         }
       >
         <p>
-          {capitalize(totalWord)} removal orders run on the same {count(meta.graph.cell_types)} cell types. Each step
-          takes away {stepShare} of the types still present and scores the rest again, so an attack on hubs keeps
-          finding the new hubs as the old ones go.
+          The {totalWord} attacks run side by side on the same {count(meta.graph.cell_types)} cell types, scored by the
+          two measures defined above.
         </p>
         <p>
           Targeting by {fastest.label} halves sensory-to-motor flow capacity once {percent(fastest.halvedAt)} of

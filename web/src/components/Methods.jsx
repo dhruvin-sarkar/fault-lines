@@ -1,7 +1,7 @@
 import { Sidenote, TextBlock } from "./ui.jsx";
 import { useResult } from "./findings/Finding.jsx";
 import { blobUrl, repoUrl } from "../lib/data.js";
-import { count, fixed, percent } from "../lib/format.js";
+import { count, fixed, percent, sentence } from "../lib/format.js";
 import "../styles/methods.css";
 
 // Fixed in the pre-registration before any run; the ensemble actually scored is read from nulls.json.
@@ -29,9 +29,7 @@ const MAKE_TARGETS = [
   ["make test", "unit tests"],
 ];
 
-const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-
-/** Number of batches in the removal schedule: ceil(fraction x remaining) until at least `limit` of n is removed. */
+/** Number of batches in the removal schedule: ceil(fraction × remaining) until at least `limit` of n is removed. */
 function batchCount(n, fraction, limit) {
   let removed = 0;
   let batches = 0;
@@ -178,6 +176,7 @@ export default function Methods({ meta }) {
   const batchPercent = Math.round(100 * p.batch_fraction_of_remaining);
   const limit = p.auc_range[1];
   const limitPercent = Math.round(100 * limit);
+  const minInput = percent(g.edge_min_input_fraction ?? 0.01, 0);
   const batches = batchCount(g.cell_types, p.batch_fraction_of_remaining, limit);
 
   const literature = useResult("literature.json").data;
@@ -208,7 +207,7 @@ export default function Methods({ meta }) {
   }
 
   return (
-    <section className="section mt" id="methods" aria-labelledby="methods-title">
+    <section className="section" id="methods" aria-labelledby="methods-title">
       <div className="wrap">
         <header className="section-head mt-head">
           <h2 id="methods-title">Methods and limits</h2>
@@ -260,8 +259,8 @@ export default function Methods({ meta }) {
         <Part id="methods-graph" title="Graph construction">
           <TextBlock
             notes={
-              <Sidenote title="The 1% input rule">
-                A connection enters the graph only if it supplies at least 1% of the receiving type&apos;s input
+              <Sidenote title={`The ${minInput} input rule`}>
+                A connection enters the graph only if it supplies at least {minInput} of the receiving type&apos;s input
                 synapses. It discards connections that make up a very small share of a type&apos;s input.
               </Sidenote>
             }
@@ -269,14 +268,14 @@ export default function Methods({ meta }) {
             <p>
               Neurons are aggregated by cell type. Each node is a type, and the weight of the directed edge from type A
               to type B is the total number of synapses from neurons of A onto neurons of B. An edge is kept only if it
-              supplies at least 1% of B&apos;s input synapses from typed neurons, with synapses between neurons of the
+              supplies at least {minInput} of B&apos;s input synapses from typed neurons, with synapses between neurons of the
               same type counted in that total; self-loops are then dropped. Each type takes the superclass held by the
               majority of its neurons.
             </p>
             <p>
               A second graph resolves hemispheres. Every type is split into one node per side, taken from the soma side
               where it is recorded and from the nerve root side for sensory neurons whose cell bodies lie outside the
-              CNS. The same 1% rule applies. This graph is used only for the bilateral redundancy analysis.
+              CNS. The same {minInput} rule applies. This graph is used only for the bilateral redundancy analysis.
             </p>
           </TextBlock>
 
@@ -348,12 +347,16 @@ export default function Methods({ meta }) {
               divided by their intact values.
             </p>
             <p>
-              <strong>Fragility</strong> is the trapezoidal area under a normalized curve against the fraction of types
+              <strong>Fragility</strong>, or AUC, is the trapezoidal area under a normalized curve against the fraction of types
               removed, up to the first batch at which at least {limitPercent}% are gone, divided by that range. Lower
               values mean a more fragile network.
             </p>
             <p>
-              <strong>The critical fraction</strong> is the fraction of types removed at which flow capacity first falls
+              <strong>
+                The halving point, <i>f</i>
+                <sub>c</sub>,
+              </strong>{" "}
+              is the fraction of types removed at which flow capacity first falls
               below half its intact value, interpolated linearly between the last batch at or above half and the first
               batch below. Runs continue past {limitPercent}% removal, with the same batch rule and random stream, until
               that happens, so every strategy has a value.
@@ -365,7 +368,7 @@ export default function Methods({ meta }) {
           <TextBlock
             notes={
               <Sidenote title="Adaptive removal">
-                Scores are recomputed after every batch, so a type that becomes central once its neighbours are gone is
+                Scores are recomputed after every batch, so a type that becomes central once its neighbors are gone is
                 taken next. Rankings fixed on the intact graph are often less damaging.
               </Sidenote>
             }
@@ -381,16 +384,16 @@ export default function Methods({ meta }) {
           <Table number={2} title="Removal protocol">
             <RowTable
               rows={[
-                ["Strategies", `${capitalize(strategyLabels.join(", "))} (${nStrategies})`],
+                ["Strategies", `${sentence(strategyLabels.join(", "))} (${nStrategies})`],
                 ["Batch size", `${batchPercent}% of the remaining types, rounded up`],
                 ["Recomputation", "All scores, after every batch"],
                 ["Ties", "Broken in seeded random order"],
                 [
                   "Maximum removed",
-                  `${limitPercent}% of types (${batches} batches); longer only to reach the critical fraction`,
+                  `${limitPercent}% of types (${batches} batches); longer only to reach the halving point`,
                 ],
                 ["Random trials", `${p.random_trials}, summarized as the mean with a Student t 95% confidence interval`],
-                ["Seed", `${p.seed}; each random trial uses the base seed + 1000 x strategy index + trial number`],
+                ["Seed", `${p.seed}; each random trial uses the base seed + 1000 × strategy index + trial number`],
               ]}
             />
           </Table>
@@ -424,8 +427,8 @@ export default function Methods({ meta }) {
             <p>
               <strong>Degree-preserving null model.</strong> Each randomized graph is made with {SWAPS_PER_EDGE} edge
               swaps per edge on simple graphs, which keep every type&apos;s in-degree and out-degree exactly. Each
-              type&apos;s outgoing synapse counts are shuffled across its new outgoing edges, so out-strength is
-              preserved as well, and S and M keep their labels. Every randomized graph goes through the identical
+              type&apos;s outgoing synapse counts are shuffled across its new outgoing edges, so weighted
+              out-degree is preserved as well, and S and M keep their labels. Every randomized graph goes through the identical
               protocol, including {p.random_trials} random trials. For each strategy the hypothesis is one-sided: the
               real graph has a lower flow-capacity AUC than its randomizations. The empirical p-value is (1 + randomized
               graphs with AUC at or below the real AUC) / (N + 1).
@@ -544,7 +547,7 @@ export default function Methods({ meta }) {
                 or genetic line necessarily does.
               </li>
               <li>
-                <strong>The 1% input threshold is a choice.</strong> It drops weak connections that may still matter,
+                <strong>The {minInput} input threshold is a choice.</strong> It drops weak connections that may still matter,
                 and a different cutoff would give a different edge set. The analysis was run at this threshold only.
               </li>
               <li>

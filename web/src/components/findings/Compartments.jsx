@@ -2,8 +2,8 @@ import { useState } from "react";
 import { ChartFrame, Row, Tooltip, XAxis, YAxis } from "../Chart.jsx";
 import { Figure, Keynote, Segmented, Sidenote, TextBlock } from "../ui.jsx";
 import { Finding, Pending, useResult } from "./Finding.jsx";
-import { LineLabels, inkColor, labelRoom, sentence, spread, xTicks } from "./marks.jsx";
-import { count, fixed, indexAt, pValue, percent, strategyLabel } from "../../lib/format.js";
+import { LineLabels, inkColor, labelRoom, spread, xTicks } from "./marks.jsx";
+import { count, fixed, indexAt, numberWord, pValue, percent, sentence, strategyLabel } from "../../lib/format.js";
 import { useWidth } from "../../lib/hooks.js";
 import { line, linear, niceTicks } from "../../lib/scales.js";
 import "../../styles/findings-b.css";
@@ -46,7 +46,7 @@ function CompartmentsView({ data, meta }) {
   const alike = welch && welch.auc_flow.p_value >= SIGNIFICANCE && welch.auc_reachability.p_value >= SIGNIFICANCE;
   const focusId = focus === "all" ? null : focus;
   const options = [
-    { value: "all", label: "All" },
+    { value: "all", label: `All ${numberWord(strategies.length)}` },
     ...strategies.map((s) => ({ value: s.id, label: sentence(strategyLabel(s.id)), color: color(s.id) })),
   ];
 
@@ -150,7 +150,7 @@ function CompartmentsView({ data, meta }) {
             <tbody>
               {strategies.map((s) => (
                 <tr key={s.id}>
-                  <td>{strategyLabel(s.id)}</td>
+                  <td>{strategyLabel(s.id, { capital: true })}</td>
                   <td className="num">{percent(brain.f_c[s.id])}</td>
                   <td className="num">{percent(cord.f_c[s.id])}</td>
                   <td className="num">{fixed(brain.scores[s.id]?.auc_flow, 3)}</td>

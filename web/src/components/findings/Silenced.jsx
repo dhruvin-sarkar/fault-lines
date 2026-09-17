@@ -3,8 +3,8 @@ import Atlas, { atlasAspect } from "../Atlas.jsx";
 import { ChartFrame, Row, Tooltip, XAxis, YAxis } from "../Chart.jsx";
 import { Figure, Segmented, Sidenote, Slider, TextBlock } from "../ui.jsx";
 import { Finding } from "./Finding.jsx";
-import { LineLabels, inkColor, labelRoom, sentence, xTicks } from "./marks.jsx";
-import { count, indexAt, percent, strategyLabel } from "../../lib/format.js";
+import { LineLabels, inkColor, labelRoom, xTicks } from "./marks.jsx";
+import { count, indexAt, percent, strategyLabel, sentence } from "../../lib/format.js";
 import { usePlayhead, useReducedMotion, useWidth } from "../../lib/hooks.js";
 import { line, linear, niceTicks } from "../../lib/scales.js";
 import "../../styles/findings-b.css";
@@ -112,7 +112,7 @@ export default function Silenced({ meta, percolation, types, atlas }) {
       >
         <p>
           A cell type can stay in the graph and still be unreachable. If no directed path leads to it from any sensory
-          type, nothing sensed can reach it through the wiring. After every removal batch we count those types among
+          type, nothing sensed can reach it through the wiring. After every removal batch, those types are counted among
           the ones not yet removed.
         </p>
         <p>
@@ -133,7 +133,7 @@ export default function Silenced({ meta, percolation, types, atlas }) {
         variant="field"
         title="Where the cut-off types are"
         controls={
-          <button type="button" className="btn fb-play" aria-pressed={playing} onClick={toggle}>
+          <button type="button" className="btn is-strong fb-play" onClick={toggle}>
             <svg viewBox="0 0 14 14" aria-hidden="true">
               {playing ? <path d="M3 2h3v10H3zM8 2h3v10H8z" fill="currentColor" /> : <path d="M3 1.5v11l9.5-5.5z" fill="currentColor" />}
             </svg>
@@ -145,7 +145,7 @@ export default function Silenced({ meta, percolation, types, atlas }) {
             One point per cell type, placed in the neuropil that holds most of its synapses. Each map follows one
             strategy up to the level set below. Types still reached from sensory input glow; a removed type flares red
             in the batch that takes it and then goes dark; a type still present but unreachable from every sensory
-            type dims to grey. Play the removal batch by batch, drag the slider, or click the chart above to set the
+            type dims to gray. Play the removal batch by batch, drag the slider, or click the chart above to set the
             level.
           </>
         }
@@ -168,7 +168,7 @@ export default function Silenced({ meta, percolation, types, atlas }) {
             </li>
             <li>
               <span className="fb-square" style={{ background: "var(--field-ink-3)" }} />
-              Cut off
+              Cut off from sensory input
             </li>
             <li>
               <span className="fb-square" style={{ background: "var(--signal-glow)" }} />

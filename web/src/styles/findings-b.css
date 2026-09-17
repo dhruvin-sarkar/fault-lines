@@ -221,9 +221,8 @@
 }
 
 /* Cut off, still present: three atlases on the field */
-.fb-play svg {
-  width: 12px;
-  height: 12px;
+.fb-play {
+  min-width: 9.5rem;
 }
 
 .fb-maps {
@@ -583,7 +582,7 @@
   margin-top: 0;
 }
 
-.fb-favoured {
+.fb-favored {
   margin: 1.25rem 0 0.75rem;
   font-family: var(--serif);
   font-size: var(--step-1);

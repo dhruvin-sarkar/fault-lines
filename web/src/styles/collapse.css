@@ -150,13 +150,6 @@
   color: var(--field-ink-2);
 }
 
-.race-scrub .slider output {
-  font-family: var(--serif);
-  font-size: var(--step-1);
-  font-weight: 460;
-  white-space: nowrap;
-}
-
 .race-side {
   display: grid;
   gap: 0.9rem;

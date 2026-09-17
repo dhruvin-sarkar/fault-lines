@@ -1,12 +1,25 @@
 import { XAxis, YAxis } from "../Chart.jsx";
+import { sentence } from "../../lib/format.js";
 import { logTicks } from "../../lib/scales.js";
 
 const CHAR = 6.7;
 
-/** A label in sentence case, for axis titles, row labels and keys. */
-export const sentence = (text) => (text ? `${text[0].toUpperCase()}${text.slice(1)}` : text);
+/** Distributions a power-law fit is tested against, named with their article for running text. */
+export const ALTERNATIVES = {
+  exponential: "an exponential",
+  lognormal: "a lognormal",
+  truncated_power_law: "a truncated power law",
+};
 
-/** Strategy colour for marks on paper. */
+/** Plain reading of a normalized log-likelihood ratio test of a power law against one alternative. */
+export function verdict(comparison, name, significance) {
+  if (comparison.p_value >= significance) return `A power law and ${name} cannot be told apart`;
+  return comparison.loglikelihood_ratio > 0
+    ? `A power law fits better than ${name}`
+    : `${sentence(name)} fits better than a power law`;
+}
+
+/** Strategy color for marks on paper. */
 export const inkColor = (id) => `var(--s-${id}-ink)`;
 
 /** A power of ten set as 10 with a raised exponent. */
@@ -146,10 +159,16 @@ export function xTicks(max, narrow) {
   return Array.from({ length: Math.floor(max / step + 1e-9) + 1 }, (_, i) => Number((i * step).toFixed(2)));
 }
 
-/** "p = value" with very small values as a power of ten; a p that underflowed to zero reads as below 0.001. */
+/** "p = value" with very small values as a power of ten; a p that underflowed to zero reads as below 10^-323. */
 export function PValue({ p }) {
   if (p == null) return "p not available";
-  if (p === 0) return "p < 0.001";
+  if (p === 0) {
+    return (
+      <>
+        p &lt; 10<sup className="fb-sup">−323</sup>
+      </>
+    );
+  }
   if (p >= 0.001) return `p = ${p < 0.01 ? p.toFixed(3) : p.toFixed(2)}`;
   const [mantissa, exponent] = p.toExponential(1).split("e");
   return (
