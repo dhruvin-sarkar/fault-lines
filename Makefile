@@ -65,8 +65,8 @@ verify:
 readme:
 	$(PYTHON) -m pipeline.readme_assets
 
-# GIFs and the phone strip of the site; needs `npm run dev` in web/ and Chrome started with
-# --remote-debugging-port=9222.
+# GIFs and the phone strip of the site. Recording needs the built site served with `npx vite preview --port 4173`
+# in web/ and Chrome started with --remote-debugging-port=9222; `site_captures assemble` rebuilds from saved frames.
 captures:
 	$(PYTHON) -m pipeline.site_captures
 

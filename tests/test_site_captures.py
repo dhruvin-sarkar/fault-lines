@@ -66,3 +66,68 @@ def test_rounded_blacks_out_corners():
     image = sc.rounded(Image.new("RGB", (100, 100), (255, 255, 255)), 20)
     assert image.getpixel((0, 0)) == sc.FIELD
     assert image.getpixel((50, 50)) == (255, 255, 255)
+
+
+def test_rounded_uses_the_given_ground():
+    image = sc.rounded(Image.new("RGB", (100, 100), (255, 255, 255)), 20, sc.STRIP_FIELD)
+    assert image.getpixel((0, 0)) == sc.STRIP_FIELD
+
+
+def test_band_pads_and_rounds_outward():
+    rect = {"left": 40.4, "top": 100.6, "right": 1224.2, "bottom": 699.3}
+    assert sc.band(rect, 0, -16, 0) == [40, 116, 1225, 700]
+    assert sc.band(rect, 24, 28, 20) == [16, 72, 1249, 720]
+
+
+def test_stack_bands_crops_at_device_scale_and_stacks():
+    image = Image.new("RGB", (40, 40), (10, 10, 10))
+    image.paste((200, 0, 0), (0, 0, 40, 10))
+    image.paste((0, 200, 0), (0, 30, 40, 40))
+    stacked = sc.stack_bands(image, [[0, 0, 20, 5], [0, 15, 20, 20]], 2)
+    assert stacked.size == (40, 20)
+    assert stacked.getpixel((5, 5)) == (200, 0, 0)
+    assert stacked.getpixel((5, 15)) == (0, 200, 0)
+
+
+def test_save_gif_frames_decode_to_their_source(tmp_path):
+    frames = []
+    for i in range(4):
+        frame = Image.new("RGB", (32, 24), (20, 20, 20))
+        frame.paste((230, 90, 40), (i * 6, 4, i * 6 + 8, 12))
+        frame.paste((60, 140, 230), (0, 18, 32, 24))
+        frames.append(frame)
+    path = tmp_path / "clip.gif"
+    sc.save_gif(path, frames, [100, 100, 100, 900])
+    with Image.open(path) as gif:
+        assert gif.n_frames == 4
+        for i, frame in enumerate(frames):
+            gif.seek(i)
+            assert sc.same_frame(gif.convert("RGB"), frame)
+
+
+def test_save_gif_rejects_a_full_palette(tmp_path):
+    with pytest.raises(ValueError):
+        sc.save_gif(tmp_path / "clip.gif", [Image.new("RGB", (4, 4))], [100], colors=256)
+
+
+def test_assemble_builds_gif_and_strip_from_plans(tmp_path):
+    frames, out = tmp_path / "frames", tmp_path / "out"
+    out.mkdir()
+    clip, phones = frames / "clip", frames / "phones"
+    clip.mkdir(parents=True)
+    phones.mkdir()
+    for i in range(3):
+        Image.new("RGB", (80, 60), (i * 80, 20, 20)).save(clip / f"f{i}.png")
+        Image.new("RGB", (39, 84), (240, 240, 240)).save(phones / f"p{i}.png")
+    sc.write_plan(clip, {"output": "clip.gif", "scale": 2, "bands": [[0, 0, 40, 10], [0, 20, 40, 30]],
+                         "frames": [["f0.png", 500], ["f1.png", 100], ["f2.png", 1500]]})
+    sc.write_plan(phones, {"output": "strip.png", "shots": ["p0.png", "p1.png", "p2.png"]})
+    written = sc.assemble(frames, out, ["clip", "phones"])
+    assert [p.name for p in written] == ["clip.gif", "strip.png"]
+    with Image.open(out / "clip.gif") as gif:
+        assert gif.size == (sc.GIF_WIDTH, sc.GIF_WIDTH // 2)
+        assert gif.n_frames == 3
+        assert gif.info["loop"] == 0
+    with Image.open(out / "strip.png") as strip:
+        assert strip.width == sc.STRIP_WIDTH
+        assert strip.getpixel((0, 0)) == sc.STRIP_FIELD

@@ -1,13 +1,14 @@
-"""Record README animations and a phone-width strip of the site from an already-running Chrome.
+"""Record README animations and a phone-width strip of the site, then assemble them from the saved frames.
 
-Chrome must have been started with ``--remote-debugging-port``; this module connects to it over the
-DevTools protocol, opens one tab of its own, and closes that tab when it is done.
+Recording connects to an already-running Chrome started with ``--remote-debugging-port``, opens one tab of its
+own, saves full-viewport screenshots and a ``plan.json`` per scene under the frames directory, and closes the tab.
+Assembly reads those frames and plans and writes the GIFs and the strip to ``assets/readme/``; it needs no browser,
+so frames taken by any DevTools client that follows the same plans can be assembled the same way.
 """
 
 import argparse
 import base64
 import hashlib
-import io
 import json
 import os
 import socket
@@ -15,19 +16,28 @@ import struct
 import time
 import urllib.parse
 import urllib.request
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from collections.abc import Sequence
+from pathlib import Path
 
+import numpy as np
 from PIL import Image, ImageChops, ImageDraw
 
-from pipeline.common import ASSETS
+from pipeline.common import ASSETS, DATA
 
 OUT_DIR = ASSETS / "readme"
-SITE = "http://localhost:5173/fault-lines/"
+FRAMES_DIR = DATA / "captures"
+SITE = "http://localhost:4173/fault-lines/"
 DEVTOOLS = "http://127.0.0.1:9222"
-GIF_WIDTH = 880
+DESKTOP = (1280, 1400)
+PHONE = (390, 844)
+SCALE = 2
+GIF_WIDTH = 1320
+GIF_COLORS = 255
 STRIP_WIDTH = 1760
+PHONE_WIDTH = 380
+STRIP_MARGIN = 48
 FIELD = (0, 0, 0)
+STRIP_FIELD = (52, 54, 58)
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 
@@ -156,15 +166,15 @@ def browser_endpoint(devtools: str) -> str:
             return json.load(response)["webSocketDebuggerUrl"]
     except OSError as error:
         raise SystemExit(
-            f"No Chrome DevTools endpoint at {devtools} ({error}). Start Chrome with "
-            "--remote-debugging-port=9222 and run the site with `npm run dev` in web/, then try again."
+            f"No Chrome DevTools endpoint at {devtools} ({error}). Start Chrome with --remote-debugging-port=9222, "
+            "build the site and serve it with `npx vite preview --port 4173` in web/, then try again."
         ) from error
 
 
 class Tab:
     """One tab opened in the running browser, driven through a flat session."""
 
-    def __init__(self, devtools: DevTools, width: int, height: int, scale: float = 1, mobile: bool = False) -> None:
+    def __init__(self, devtools: DevTools, width: int, height: int, scale: float = SCALE, mobile: bool = False) -> None:
         self.dt = devtools
         self.target = devtools.call("Target.createTarget", {"url": "about:blank"})["targetId"]
         self.session = devtools.call("Target.attachToTarget", {"targetId": self.target, "flatten": True})["sessionId"]
@@ -174,7 +184,7 @@ class Tab:
     def call(self, method: str, params: dict | None = None) -> dict:
         return self.dt.call(method, params, self.session)
 
-    def resize(self, width: int, height: int, scale: float = 1, mobile: bool = False) -> None:
+    def resize(self, width: int, height: int, scale: float = SCALE, mobile: bool = False) -> None:
         self.width, self.height, self.scale = width, height, scale
         self.call("Emulation.setDeviceMetricsOverride",
                   {"width": width, "height": height, "deviceScaleFactor": scale, "mobile": mobile})
@@ -199,51 +209,214 @@ class Tab:
         self.wait_for("document.readyState === 'complete'")
         self.wait_for(ready)
         self.evaluate("document.fonts.ready.then(() => true)")
-        time.sleep(0.6)
+        time.sleep(0.8)
 
-    def scroll_to(self, selector: str, offset: int = 72) -> None:
-        self.evaluate(
+    def scroll_to(self, selector: str, offset: int) -> float:
+        """Scroll so the element matching ``selector`` starts ``offset`` pixels below the viewport top."""
+        top = self.evaluate(
             f"(() => {{ const el = document.querySelector({json.dumps(selector)});"
-            f" window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - {offset}); return true; }})()"
+            f" const top = el.getBoundingClientRect().top + window.scrollY - {offset};"
+            " window.scrollTo({top, behavior: 'instant'}); return top; })()"
         )
         time.sleep(0.5)
+        return top
 
     def rect(self, selector: str) -> dict:
         """Viewport rectangle of the first element matching ``selector``."""
         return self.evaluate(
             f"(() => {{ const r = document.querySelector({json.dumps(selector)}).getBoundingClientRect();"
-            " return {x: r.left, y: r.top, width: r.width, height: r.height}; })()"
+            " return {left: r.left, top: r.top, right: r.right, bottom: r.bottom}; })()"
         )
 
-    def click(self, expression: str) -> None:
-        """Click the element returned by the JavaScript ``expression``."""
-        self.evaluate(f"(() => {{ ({expression}).click(); return true; }})()")
-
-    def type_text(self, selector: str, text: str, delay: float, on_key: Callable[[], None] | None = None) -> None:
-        self.evaluate(f"(() => {{ document.querySelector({json.dumps(selector)}).focus(); return true; }})()")
-        for ch in text:
-            self.call("Input.insertText", {"text": ch})
-            time.sleep(delay)
-            if on_key:
-                on_key()
+    def insert_text(self, text: str) -> None:
+        self.call("Input.insertText", {"text": text})
 
     def press(self, key: str, code: int) -> None:
         for kind in ("keyDown", "keyUp"):
             self.call("Input.dispatchKeyEvent", {"type": kind, "key": key, "code": key, "windowsVirtualKeyCode": code})
 
-    def shot(self, clip: dict | None = None) -> Image.Image:
-        """Screenshot of the viewport, or of ``clip`` in viewport coordinates, as an RGB image."""
-        params: dict = {"format": "png", "captureBeyondViewport": False}
-        if clip:
-            params["clip"] = {**clip, "scale": 1}
-        data = self.call("Page.captureScreenshot", params)["data"]
-        return Image.open(io.BytesIO(base64.b64decode(data))).convert("RGB")
+    def save_shot(self, path: Path) -> None:
+        """Save a screenshot of the whole viewport at the device scale."""
+        data = self.call("Page.captureScreenshot", {"format": "png", "captureBeyondViewport": False})["data"]
+        path.write_bytes(base64.b64decode(data))
 
     def close(self) -> None:
         self.dt.call("Target.closeTarget", {"targetId": self.target})
 
 
-# Frame handling.
+# Page scripts shared by every recorder. Each is a function expression called with one argument.
+
+# A transparent layer over the page, so stray pointer or wheel input cannot hover, seek or scroll while frames are taken.
+SHIELD_JS = """() => {
+  if (document.getElementById('capture-shield')) return true;
+  const shield = document.createElement('div');
+  shield.id = 'capture-shield';
+  shield.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:transparent;';
+  shield.addEventListener('wheel', (e) => e.preventDefault(), {passive: false});
+  document.body.appendChild(shield);
+  return true;
+}"""
+
+RACE_SEEK_JS = """async (step) => {
+  const input = document.querySelector('#collapse-race .race-scrub input');
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+  document.activeElement && document.activeElement.blur();
+  setValue.call(input, String(step));
+  input.dispatchEvent(new Event('input', {bubbles: true}));
+  await new Promise((r) => setTimeout(r, 450));
+  return Number(input.value);
+}"""
+
+# Clicks the busiest-type button and freezes the transitions it starts, so they can be sampled at fixed times.
+MEASURE_REMOVE_JS = """async () => {
+  const toy = document.querySelector('#measure-toy');
+  const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const button = [...toy.querySelectorAll('button')].find((b) => /busiest/i.test(b.textContent));
+  button.click();
+  await frame();
+  window.captureHeld = document.getAnimations().filter((a) => toy.contains(a.effect && a.effect.target));
+  window.captureHeld.forEach((a) => { a.pause(); a.currentTime = 0; });
+  await frame();
+  return button.disabled;
+}"""
+
+HELD_AT_JS = """async (ms) => {
+  (window.captureHeld || []).forEach((a) => { if (ms === null) a.finish(); else a.currentTime = ms; });
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  if (ms === null) await new Promise((r) => setTimeout(r, 350));
+  return true;
+}"""
+
+
+def call_js(function: str, argument=None) -> str:
+    return f"({function})({json.dumps(argument)})"
+
+
+def write_plan(folder: Path, plan: dict) -> None:
+    (folder / "plan.json").write_text(json.dumps(plan, indent=1) + "\n", encoding="utf-8")
+
+
+def band(rect: dict, x_pad: float, top_pad: float, bottom_pad: float) -> list[int]:
+    """Viewport box around ``rect`` in CSS pixels, padded and rounded outward."""
+    return [int(rect["left"] - x_pad), int(rect["top"] - top_pad), int(np.ceil(rect["right"] + x_pad)),
+            int(np.ceil(rect["bottom"] + bottom_pad))]
+
+
+# Recorders. Each saves full-viewport screenshots into ``folder`` and writes the plan that assembles them.
+
+def record_collapse(tab: Tab, folder: Path, site: str) -> None:
+    """Every removal step of the race, reached through its slider, with the maps below the chart."""
+    tab.resize(*DESKTOP)
+    tab.open(site + "#collapse", "document.querySelector('#collapse-race .race-scrub input')")
+    tab.scroll_to("#collapse-race", 72)
+    tab.evaluate(call_js(SHIELD_JS))
+    last = int(tab.evaluate("Number(document.querySelector('#collapse-race .race-scrub input').max)"))
+    frames = []
+    for step in range(last + 1):
+        tab.evaluate(call_js(RACE_SEEK_JS, step))
+        name = f"f{step:02d}.png"
+        tab.save_shot(folder / name)
+        frames.append([name, 1400 if step == 0 else 3200 if step == last else 130])
+    figure, scrub = tab.rect("#collapse-race"), tab.rect("#collapse-race .race-scrub")
+    head, maps = tab.rect("#collapse-race .race-multiples-head"), tab.rect("#collapse-race .race-multiples")
+    chart = band({**figure, "bottom": scrub["bottom"]}, 0, -16, 0)
+    grid = band({**figure, "top": head["top"], "bottom": maps["bottom"]}, 0, 13, 12)
+    write_plan(folder, {"output": "collapse-race.gif", "scale": SCALE, "bands": [chart, grid], "frames": frames})
+
+
+def record_measure(tab: Tab, folder: Path, site: str, samples: Sequence[int] = (0, 90, 180)) -> None:
+    """The small network losing its busiest type until no route is left, sampling each transition."""
+    tab.resize(*DESKTOP)
+    tab.open(site + "#measure", "document.querySelector('#measure-toy')")
+    tab.scroll_to("#measure-toy", 72)
+    tab.evaluate(call_js(SHIELD_JS))
+    tab.save_shot(folder / "s0_final.png")
+    frames = [["s0_final.png", 1800]]
+    step, done = 0, False
+    while not done:
+        step += 1
+        done = tab.evaluate(call_js(MEASURE_REMOVE_JS))
+        for ms in samples:
+            tab.evaluate(call_js(HELD_AT_JS, ms))
+            name = f"s{step}_t{ms:03d}.png"
+            tab.save_shot(folder / name)
+            frames.append([name, 80])
+        tab.evaluate(call_js(HELD_AT_JS, None))
+        tab.save_shot(folder / f"s{step}_final.png")
+        frames.append([f"s{step}_final.png", 3600 if done else 1400])
+    figure, body = tab.rect("#measure-toy"), tab.rect("#measure-toy .figure-body")
+    box = band({**figure, "bottom": body["bottom"]}, 0, -16, 16)
+    write_plan(folder, {"output": "measure-routes.gif", "scale": SCALE, "bands": [box], "frames": frames})
+
+
+def record_lookup(tab: Tab, folder: Path, site: str, name: str = "ALIN7") -> None:
+    """Typing a cell type name, choosing it from the list and reading its profile and map."""
+    tab.resize(*DESKTOP)
+    tab.open(site + "#lookup", "document.querySelector('#lookup-input')")
+    tab.scroll_to("#lookup .fc-lookup", 150)
+    tab.evaluate(call_js(SHIELD_JS))
+    frames = []
+
+    def shot(label: str, ms: int) -> None:
+        file = f"l{len(frames):02d}_{label}.png"
+        tab.save_shot(folder / file)
+        frames.append([file, ms])
+
+    shot("start", 1200)
+    tab.evaluate("document.querySelector('#lookup-input').focus({preventScroll: true}) || true")
+    time.sleep(0.3)
+    shot("focus", 400)
+    for i, ch in enumerate(name):
+        tab.insert_text(ch)
+        time.sleep(0.25)
+        shot(f"type{i + 1}", 600 if i == len(name) - 1 else 220)
+    tab.press("ArrowDown", 40)
+    time.sleep(0.25)
+    shot("highlight", 900)
+    tab.press("Enter", 13)
+    time.sleep(1.2)
+    tab.scroll_to("#lookup .fc-lookup", 150)
+    shot("profile", 4000)
+    box = band(tab.rect("#lookup .fc-lookup"), 24, 28, 20)
+    write_plan(folder, {"output": f"lookup-{name.lower()}.gif", "scale": SCALE, "bands": [box], "frames": frames})
+
+
+PHONE_SCREENS = (
+    ("hero", "#", None, 0),
+    ("findings", "#findings", "#findings-title", 76),
+    ("chart", "#thresholds", "#thresholds .figure", 72),
+    ("lookup", "#lookup/ALIN7", "#lookup-title", 80),
+)
+
+
+def record_phones(tab: Tab, folder: Path, site: str) -> None:
+    """Four screens at phone width: the opening, the key results, a findings chart and a cell type profile."""
+    tab.resize(*PHONE, mobile=True)
+    tab.open(site, "document.getElementById('findings')")
+    shots = []
+    for label, anchor, selector, offset in PHONE_SCREENS:
+        tab.evaluate(f"(() => {{ location.hash = {json.dumps(anchor)}; return true; }})()")
+        time.sleep(1.2)
+        if selector:
+            tab.scroll_to(selector, offset)
+        else:
+            tab.evaluate("window.scrollTo({top: 0, behavior: 'instant'}) || true")
+        tab.evaluate("(document.activeElement && document.activeElement.blur()) || true")
+        time.sleep(0.8)
+        tab.save_shot(folder / f"{label}.png")
+        shots.append(f"{label}.png")
+    write_plan(folder, {"output": "site-phone-strip.png", "shots": shots})
+
+
+RECORDERS = {
+    "collapse": record_collapse,
+    "measure": record_measure,
+    "lookup": record_lookup,
+    "phones": record_phones,
+}
+
+
+# Frame handling and assembly.
 
 def fit_width(image: Image.Image, width: int) -> Image.Image:
     """Resize ``image`` to ``width`` keeping its aspect ratio."""
@@ -270,12 +443,56 @@ def collapse_frames(frames: Sequence[Image.Image], durations: Sequence[int]) -> 
     return kept, times
 
 
-def save_gif(path, frames: Sequence[Image.Image], durations: Sequence[int], colors: int = 160) -> None:
-    """Write an endlessly looping GIF, collapsing repeated frames and quantizing each to ``colors``."""
+def stack_bands(image: Image.Image, bands: Sequence[Sequence[int]], scale: float) -> Image.Image:
+    """Crop each (left, top, right, bottom) CSS-pixel box of a screenshot and stack the crops vertically."""
+    crops = [image.crop(tuple(round(v * scale) for v in box)) for box in bands]
+    out = Image.new("RGB", (max(c.width for c in crops), sum(c.height for c in crops)), FIELD)
+    y = 0
+    for crop in crops:
+        out.paste(crop, (0, y))
+        y += crop.height
+    return out
+
+
+def shared_palette(frames: Sequence[Image.Image], colors: int, samples: int = 8) -> Image.Image:
+    """One adaptive palette for a whole clip, cut from evenly spaced frames so static regions never shimmer."""
+    picks = sorted({round(i * (len(frames) - 1) / max(samples - 1, 1)) for i in range(samples)})
+    width, height = frames[0].size
+    sheet = Image.new("RGB", (width, height * len(picks)))
+    for row, index in enumerate(picks):
+        sheet.paste(frames[index], (0, row * height))
+    return sheet.quantize(colors=colors, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE)
+
+
+def save_gif(path, frames: Sequence[Image.Image], durations: Sequence[int], colors: int = GIF_COLORS) -> None:
+    """Write an endlessly looping GIF on one shared palette.
+
+    Repeated frames are merged, and pixels unchanged from the previous frame are written as transparent so each
+    frame stores only what moved. ``colors`` must leave at least one of the 256 palette slots free.
+    """
+    if not 1 <= colors < 256:
+        raise ValueError("colors must be between 1 and 255")
     kept, times = collapse_frames(frames, durations)
-    palette_frames = [f.quantize(colors=colors, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE) for f in kept]
-    palette_frames[0].save(path, save_all=True, append_images=palette_frames[1:], duration=times, loop=0,
-                           disposal=1, optimize=False)
+    palette = shared_palette(kept, colors)
+    rgb = palette.getpalette()[: colors * 3]
+    rgb += rgb[:3] * (256 - colors)
+    # Quantizing against a padded palette can land on a padding slot; map those back to the real entry.
+    remap = np.arange(256, dtype=np.uint8)
+    remap[colors:] = 0
+    clear = colors
+    previous = None
+    images = []
+    for frame in kept:
+        index = remap[np.asarray(frame.quantize(palette=palette, dither=Image.Dither.NONE))]
+        written = index.copy()
+        if previous is not None:
+            written[index == previous] = clear
+        previous = index
+        image = Image.fromarray(written, "P")
+        image.putpalette(rgb)
+        images.append(image)
+    images[0].save(path, save_all=True, append_images=images[1:], duration=times, loop=0, disposal=1,
+                   transparency=clear, optimize=False)
 
 
 def strip_layout(count: int, width: int, phone_width: int, margin: int) -> list[int]:
@@ -288,129 +505,81 @@ def strip_layout(count: int, width: int, phone_width: int, margin: int) -> list[
     return [round(margin + i * (phone_width + gap)) for i in range(count)]
 
 
-def rounded(image: Image.Image, radius: int) -> Image.Image:
-    """``image`` with rounded corners over the black field."""
+def rounded(image: Image.Image, radius: int, ground: tuple[int, int, int] = FIELD) -> Image.Image:
+    """``image`` with rounded corners over a plain ``ground`` colour."""
     mask = Image.new("L", image.size, 0)
     ImageDraw.Draw(mask).rounded_rectangle((0, 0, image.width - 1, image.height - 1), radius, fill=255)
-    ground = Image.new("RGB", image.size, FIELD)
-    ground.paste(image, (0, 0), mask)
-    return ground
+    out = Image.new("RGB", image.size, ground)
+    out.paste(image, (0, 0), mask)
+    return out
 
 
-@dataclass
-class Recorder:
-    """Collects frames from a clip of the tab, each with its display duration."""
-
-    tab: Tab
-    selector: str
-    frames: list
-    durations: list
-
-    def grab(self, duration: int) -> None:
-        r = self.tab.rect(self.selector)
-        top = max(r["y"], 0)
-        clip = {"x": r["x"], "y": top, "width": r["width"], "height": min(r["height"], self.tab.height - top)}
-        self.frames.append(fit_width(self.tab.shot(clip), GIF_WIDTH))
-        self.durations.append(duration)
+def assemble_gif(folder: Path, plan: dict, out: Path, width: int = GIF_WIDTH) -> Path:
+    frames, durations = [], []
+    for name, ms in plan["frames"]:
+        with Image.open(folder / name) as shot:
+            frames.append(fit_width(stack_bands(shot.convert("RGB"), plan["bands"], plan["scale"]), width))
+        durations.append(ms)
+    path = out / plan["output"]
+    save_gif(path, frames, durations)
+    return path
 
 
-# Scenes.
-
-def collapse_race(tab: Tab, out, site: str) -> None:
-    """The race between the six removal orders, played from the first batch to the last."""
-    tab.open(site + "#collapse", "document.querySelector('#collapse-race .race-play')")
-    tab.scroll_to("#collapse-race")
-    rec = Recorder(tab, "#collapse-race", [], [])
-    rec.grab(1200)
-    tab.click("document.querySelector('#collapse-race .race-play')")
-    for _ in range(90):
-        time.sleep(0.12)
-        rec.grab(120)
-        if tab.evaluate("/replay/i.test(document.querySelector('#collapse-race .race-play').textContent)"):
-            break
-    rec.grab(2400)
-    save_gif(out / "collapse-race.gif", rec.frames, rec.durations)
-
-
-def measure_routes(tab: Tab, out, site: str) -> None:
-    """The small network in the measure section losing its busiest types one at a time."""
-    tab.open(site + "#measure", "document.querySelector('#measure-toy')")
-    tab.scroll_to("#measure-toy")
-    rec = Recorder(tab, "#measure-toy", [], [])
-    rec.grab(1600)
-    button = "[...document.querySelectorAll('#measure-toy button')].find(b => /busiest/i.test(b.textContent))"
-    for _ in range(8):
-        if tab.evaluate(f"({button}).disabled"):
-            break
-        tab.click(button)
-        time.sleep(0.5)
-        rec.grab(1100)
-    rec.grab(2400)
-    save_gif(out / "measure-routes.gif", rec.frames, rec.durations)
-
-
-def lookup_type(tab: Tab, out, site: str, name: str = "ALIN7") -> None:
-    """Looking up one cell type by name and opening its profile."""
-    tab.open(site + "#lookup", "document.querySelector('#lookup-input')")
-    tab.scroll_to("#lookup")
-    rec = Recorder(tab, "#lookup", [], [])
-    rec.grab(1000)
-    tab.type_text("#lookup-input", name, 0.18, on_key=lambda: rec.grab(180))
-    time.sleep(0.4)
-    rec.grab(700)
-    tab.click("document.querySelector('#lookup-listbox [role=option]')")
-    time.sleep(1.2)
-    rec.grab(3200)
-    save_gif(out / f"lookup-{name.lower()}.gif", rec.frames, rec.durations)
-
-
-def phone_strip(tab: Tab, out, site: str, anchors: Sequence[str] = ("main", "findings", "methods")) -> None:
-    """Three screens of the site at phone width, side by side on the black field."""
-    tab.resize(390, 844, scale=2, mobile=True)
-    phone_width, margin = 500, 64
+def assemble_strip(folder: Path, plan: dict, out: Path) -> Path:
     shots = []
-    for anchor in anchors:
-        tab.open(site + f"#{anchor}", f"document.getElementById({json.dumps(anchor)})")
-        if anchor != "main":
-            tab.scroll_to(f"#{anchor}", offset=0)
-        else:
-            tab.evaluate("window.scrollTo(0, 0) || true")
-            time.sleep(0.5)
-        shots.append(rounded(fit_width(tab.shot(), phone_width), 28))
-    height = max(s.height for s in shots) + 2 * margin
-    strip = Image.new("RGB", (STRIP_WIDTH, height), FIELD)
-    for x, shot in zip(strip_layout(len(shots), STRIP_WIDTH, phone_width, margin), shots):
-        strip.paste(shot, (x, margin))
-    strip.save(out / "site-phone-strip.png", optimize=True)
+    for name in plan["shots"]:
+        with Image.open(folder / name) as shot:
+            shots.append(rounded(fit_width(shot.convert("RGB"), PHONE_WIDTH), 24, STRIP_FIELD))
+    height = max(s.height for s in shots) + 2 * STRIP_MARGIN
+    strip = Image.new("RGB", (STRIP_WIDTH, height), STRIP_FIELD)
+    for x, shot in zip(strip_layout(len(shots), STRIP_WIDTH, PHONE_WIDTH, STRIP_MARGIN), shots):
+        strip.paste(shot, (x, STRIP_MARGIN))
+    path = out / plan["output"]
+    strip.save(path, optimize=True)
+    return path
 
 
-SCENES = {
-    "collapse": collapse_race,
-    "measure": measure_routes,
-    "lookup": lookup_type,
-    "phones": phone_strip,
-}
+def assemble(frames_dir: Path, out: Path, scenes: Sequence[str]) -> list[Path]:
+    """Build each scene's output in ``out`` from its folder of frames and ``plan.json`` under ``frames_dir``."""
+    written = []
+    for scene in scenes:
+        folder = frames_dir / scene
+        plan = json.loads((folder / "plan.json").read_text(encoding="utf-8"))
+        builder = assemble_strip if "shots" in plan else assemble_gif
+        written.append(builder(folder, plan, out))
+    return written
+
+
+def record(devtools_url: str, site: str, frames_dir: Path, scenes: Sequence[str]) -> None:
+    devtools = DevTools(browser_endpoint(devtools_url))
+    tab = Tab(devtools, *DESKTOP)
+    try:
+        for scene in scenes:
+            folder = frames_dir / scene
+            folder.mkdir(parents=True, exist_ok=True)
+            RECORDERS[scene](tab, folder, site)
+            print(f"Recorded {scene}")
+    finally:
+        tab.close()
+        devtools.close()
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("step", nargs="?", choices=("all", "record", "assemble"), default="all")
     parser.add_argument("--devtools", default=DEVTOOLS, help="HTTP address of Chrome's remote debugging port")
     parser.add_argument("--site", default=SITE)
-    parser.add_argument("--only", nargs="*", choices=sorted(SCENES), help="record only these scenes")
+    parser.add_argument("--frames", type=Path, default=FRAMES_DIR, help="folder holding one subfolder of frames per scene")
+    parser.add_argument("--only", nargs="*", choices=sorted(RECORDERS), help="handle only these scenes")
     args = parser.parse_args()
     site = args.site if args.site.endswith("/") else args.site + "/"
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    devtools = DevTools(browser_endpoint(args.devtools))
-    tab = Tab(devtools, 1280, 900)
-    try:
-        for name in args.only or SCENES:
-            if name != "phones":
-                tab.resize(1280, 900)
-            SCENES[name](tab, OUT_DIR, site)
-            print(f"Recorded {name}")
-    finally:
-        tab.close()
-        devtools.close()
+    scenes = args.only or list(RECORDERS)
+    if args.step in ("all", "record"):
+        record(args.devtools, site, args.frames, scenes)
+    if args.step in ("all", "assemble"):
+        OUT_DIR.mkdir(parents=True, exist_ok=True)
+        for path in assemble(args.frames, OUT_DIR, scenes):
+            print(f"Wrote {path.relative_to(OUT_DIR.parent.parent)}")
 
 
 if __name__ == "__main__":
