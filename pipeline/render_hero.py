@@ -1,8 +1,10 @@
 """Render the male CNS neuropils, each shaded by the sensory-to-motor flow lost when its cell types are removed."""
 
+import hashlib
 import json
 import textwrap
 import urllib.parse
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -11,7 +13,7 @@ from matplotlib.collections import PolyCollection
 from matplotlib.colors import LinearSegmentedColormap, to_rgb
 from PIL import Image
 
-from pipeline.common import ASSETS, DATA, RESULTS
+from pipeline.common import ASSETS, DATA, RESULTS, ROOT
 from pipeline.figures import plt
 from pipeline.fonts import register
 from pipeline.removal_strategies import STRATEGY_LABELS
@@ -34,6 +36,9 @@ UNSCORED_ROIS = ("CV-anterior", "CV-posterior")
 UNSCORED_COLOR = "#d6d5cf"
 GAMMA = 0.5
 SCALE_TICKS = (0.0, 0.02, 0.05, 0.10, 0.20, 0.35)
+MAP_MESH_BOX = (690, 5, 1780, 1062)
+MAP_SCALE_BOX = (50, 777, 640, 870)
+PAPER_DIR = ROOT / "paper"
 
 
 def mesh_names(source: str) -> list[str]:
@@ -42,11 +47,16 @@ def mesh_names(source: str) -> list[str]:
     return list(info["properties"][0]["values"])
 
 
+def mesh_cache_path(source: str, name: str) -> Path:
+    """Cache file for one neuropil mesh, unique even on case-insensitive filesystems (AL(R) and aL(R) both exist)."""
+    digest = hashlib.sha1(name.encode("utf-8")).hexdigest()[:8]
+    return MESH_CACHE / source / f"{name}.{digest}.ngmesh"
+
+
 def load_mesh(source: str, name: str) -> tuple[np.ndarray, np.ndarray] | None:
     """Vertices (nm) and triangles of one neuropil, cached on disk; None when no mesh is published."""
-    cache = MESH_CACHE / source
-    cache.mkdir(parents=True, exist_ok=True)
-    path = cache / f"{name}.ngmesh"
+    path = mesh_cache_path(source, name)
+    path.parent.mkdir(parents=True, exist_ok=True)
     if not path.exists():
         response = requests.get(f"{MESH_SOURCES[source]}/mesh/{urllib.parse.quote(name)}.ngmesh", timeout=600)
         if response.status_code == 404:
@@ -176,6 +186,18 @@ def render(meshes: dict, impact: pd.Series, headline: dict, path, pitch: float =
     image.resize(HERO_SIZE, Image.LANCZOS).save(path, optimize=True)
 
 
+def crop_regional_map(hero_path, path) -> None:
+    """Cut the report's regional impact figure from the hero: the meshes, with the color scale beneath and no title."""
+    hero = Image.open(hero_path).convert("RGB")
+    if hero.size != HERO_SIZE:
+        raise ValueError(f"Expected a {HERO_SIZE[0]}x{HERO_SIZE[1]} hero, got {hero.size[0]}x{hero.size[1]}")
+    mesh, scale = hero.crop(MAP_MESH_BOX), hero.crop(MAP_SCALE_BOX)
+    figure = Image.new("RGB", (mesh.width, mesh.height + scale.height), PAPER)
+    figure.paste(mesh, (0, 0))
+    figure.paste(scale, (0, mesh.height))
+    figure.save(path, optimize=True)
+
+
 def main() -> None:
     table = load_regional_impact()
     impact = table.set_index("neuropil")["flow_drop"]
@@ -186,6 +208,7 @@ def main() -> None:
     meshes = load_meshes(set(impact.index) | set(UNSCORED_ROIS))
     ASSETS.mkdir(exist_ok=True)
     render(meshes, impact, headline, ASSETS / "hero.png")
+    crop_regional_map(ASSETS / "hero.png", PAPER_DIR / "regional_impact_map.png")
     missing = sorted(set(impact.index) - set(meshes))
     print(f"Rendered {len(meshes)} neuropils at {HERO_SIZE[0]}x{HERO_SIZE[1]}")
     print(f"No published mesh for {len(missing)} scored regions: {', '.join(missing)}")
