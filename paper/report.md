@@ -18,7 +18,7 @@ header-includes:
 
 # Abstract
 
-The complete connectome of the adult male *Drosophila* central nervous system (neuPrint `male-cns:v1.0`) was represented as a directed graph of 11,751 cell types and 243,439 connections. Extending percolation analyses of the FlyWire brain (Lin et al. 2024) to brain and nerve cord together, sensory-to-motor routing was measured as the maximum number of edge-disjoint paths from 368 sensory to 665 descending and motor types (10,647 when intact). Under a pre-registered protocol of six adaptive removal strategies, removing cell types by weighted out-degree halves flow capacity after 4.1% of types are gone; random removal requires 28.3% (95% CI 27.7% to 28.9%), and every targeted strategy falls below that interval. The degree-preserving null-model comparison is not yet complete. Flow halves long before types become disconnected: at the half-flow point, at most 37 types have lost every path from sensory input, yet under sensory-motor betweenness a single later batch disconnects 6,046 types. Removing the strongest connections first halves flow after 26.8% of connections; removing the weakest half never does. Cascade sizes are not robustly power-law distributed (bootstrap p = 0.202 and 0.036 in two poolings). Removing both hemispheric copies of a type is superadditive for 205 of 4,449 informative types (one-sided Wilcoxon p = 5.2 × 10^−37^) and exactly additive for 4,235. Fourteen behaviorally validated cell types rank above other types in sensory-motor betweenness (one-sided Mann-Whitney p = 0.045; p = 0.10 with the positive control). All results describe a static, type-aggregated wiring diagram.
+The complete connectome of the adult male *Drosophila* central nervous system (neuPrint `male-cns:v1.0`) was represented as a directed graph of 11,751 cell types and 243,439 connections. Extending percolation analyses of the FlyWire brain (Lin et al. 2024) to brain and nerve cord together, sensory-to-motor routing was measured as the maximum number of edge-disjoint paths from 368 sensory to 665 descending and motor types (10,647 when intact). Under a pre-registered protocol of six adaptive removal strategies, removing cell types by weighted out-degree halves flow capacity after 4.1% of types are gone; random removal requires 28.3% (95% CI 27.7% to 28.9%), and every targeted strategy falls below that interval. Against 200 degree-preserving randomizations of the graph, the real flow-capacity AUC is significantly lower under all six strategies (one-sided empirical p = 0.0050 each; Bonferroni threshold 0.0083). Flow halves long before types become disconnected: at the half-flow point, at most 37 types have lost every path from sensory input, yet under sensory-motor betweenness a single later batch disconnects 6,046 types. Removing the strongest connections first halves flow after 26.8% of connections; removing the weakest half never does. Cascade sizes are not robustly power-law distributed (bootstrap p = 0.202 and 0.036 in two poolings). Removing both hemispheric copies of a type is superadditive for 205 of 4,449 informative types (one-sided Wilcoxon p = 5.2 × 10^−37^) and exactly additive for 4,235. Fourteen behaviorally validated cell types rank above other types in sensory-motor betweenness (one-sided Mann-Whitney p = 0.045; p = 0.10 with the positive control). All results describe a static, type-aggregated wiring diagram.
 
 # Introduction
 
@@ -453,13 +453,24 @@ Concentrating shortest routes is not the same as being indispensable. Removing A
 
 ## Comparison with degree-preserving randomized graphs
 
-<!-- results pending: null_model -->
-The comparison with degree-preserving randomized graphs requires 7,000 percolation runs over the 200 null graphs and was still in progress when this version of the report was prepared. Its results will be added in a revised version. The hypotheses, test, correction and every protocol parameter were fixed before any randomized graph was scored and will not change.
-<!-- end results pending: null_model -->
+All 200 randomized graphs completed the full protocol, so the test is the pre-registered one. *H*~k~ is supported for every strategy: under all six, the real flow-capacity AUC is significantly lower than that of the randomized graphs at the Bonferroni threshold of 0.0083 (p = 0.0050 each; Table 14, Figure 7). No randomized graph reached an AUC at or below the real one under every strategy, so p equals the smallest attainable value, 1/201 = 0.0050; the z-scores convey the size of the difference better than p. The z-scores of the real AUCs range from −22.7 to −3.6. The secondary test on reachability AUC is significant for four of the six strategies (weighted in-degree, betweenness, PageRank and sensory-motor betweenness).
+
+| strategy | real AUC | randomized mean ± SD | randomized range | at or below real | z | p | result |
+|---|---|---|---|---|---|---|---|
+| random | 0.570 | 0.575 ± 0.0005 | 0.574 to 0.576 | 0 / 200 | −11.5 | 0.0050 | significant |
+| weighted out-degree | 0.197 | 0.202 ± 0.0014 | 0.198 to 0.207 | 0 / 200 | −3.6 | 0.0050 | significant |
+| weighted in-degree | 0.370 | 0.593 ± 0.0099 | 0.559 to 0.621 | 0 / 200 | −22.7 | 0.0050 | significant |
+| betweenness | 0.315 | 0.345 ± 0.0034 | 0.334 to 0.354 | 0 / 200 | −8.9 | 0.0050 | significant |
+| PageRank | 0.441 | 0.590 ± 0.0080 | 0.566 to 0.607 | 0 / 200 | −18.7 | 0.0050 | significant |
+| sensory-motor betweenness | 0.233 | 0.353 ± 0.0118 | 0.322 to 0.395 | 0 / 200 | −10.1 | 0.0050 | significant |
+
+Table: One-sided tests of the flow-capacity AUC against 200 degree-preserving randomized graphs. p = (1 + graphs with AUC at or below the real AUC) / (1 + 200); significant means p below the Bonferroni threshold α = 0.05/6 = 0.0083. Random removal is the mean of 30 trials per graph.
+
+![Flow-capacity AUC of the 200 degree-preserving randomized graphs under each strategy, with the real graph's AUC as a vertical line. Each panel has its own axis.](../results/null_distribution.png){width=95%}
 
 ## Behaviorally validated cell types
 
-The curated types rank higher than other types in sensory-motor betweenness (U = 103,535, one-sided p = 0.045, AUC 0.630, median percentile 76.8), meeting the pre-registered criterion (Tables 14 and 15, Figure 7). The effect is stronger for global betweenness (p = 8.7 × 10^−6^, AUC 0.832, median percentile 94.9) and absent for single-removal flow loss (p = 0.97, AUC 0.376), since 12 of the 14 types lose no flow when removed alone.
+The curated types rank higher than other types in sensory-motor betweenness (U = 103,535, one-sided p = 0.045, AUC 0.630, median percentile 76.8), meeting the pre-registered criterion (Tables 15 and 16, Figure 8). The effect is stronger for global betweenness (p = 8.7 × 10^−6^, AUC 0.832, median percentile 94.9) and absent for single-removal flow loss (p = 0.97, AUC 0.376), since 12 of the 14 types lose no flow when removed alone.
 
 | type | behavior | evidence | *B*~SM~ | flow loss | betweenness | sources |
 |-----------|-------------------|--------|------|-------|----------|---------------------------------------|
@@ -520,9 +531,7 @@ Different centralities expose different vulnerabilities. Weighted out-degree is 
 
 The analysis shows that, in a type-level wiring diagram of the male CNS, sensory-to-motor routing capacity halves after a few percent of cell types are removed in a targeted order, against more than a quarter under random removal, and that capacity is lost long before types become disconnected. These are statements about a wiring diagram. Removing a cell type from the graph is not equivalent to silencing or ablating it in an animal. The graph carries no information about synaptic sign, synaptic efficacy beyond synapse counts, neuromodulation, electrical synapses, plasticity or neural dynamics, and flow capacity is a combinatorial property of the graph, not a model of signal propagation.
 
-<!-- results pending: null_model (interpretation) -->
-The comparison with degree-preserving randomized graphs is not yet complete, so these results do not yet establish that the real wiring is more fragile than wiring with the same degree sequence.
-<!-- end results pending: null_model (interpretation) -->
+Under every removal strategy, routing capacity in the real graph collapses significantly faster than in degree-preserving randomizations of it. The fragility therefore does not follow from the in- and out-degree sequence and out-strengths alone. The test does not identify which further features of the wiring produce it, and the randomizations do not preserve in-strength.
 
 A high structural criticality score is a hypothesis about where behaviorally relevant routing may concentrate, to be tested experimentally, not evidence that an animal depends on those neurons. The agreement with behaviorally validated cell types is modest and rests on 14 well-studied cell types. The comparison with published thresholds is qualitative, because breakdown criteria, graph resolution, edge direction and recalculation rules all differ between studies.
 

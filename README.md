@@ -6,7 +6,7 @@
 
 ## Abstract
 
-HHMI Janelia and Google Research have released a complete wiring diagram of an adult male fruit fly's central nervous system, brain and nerve cord together.[^berg] We asked how much of it has to be removed before sensory input can no longer reach motor output, and whether the order of removal matters. Percolation on the FlyWire brain connectome has tracked its largest connected components;[^lin] here the measure is directed routing, the number of edge-disjoint paths from 368 sensory to 665 descending and motor cell types (10,647 when intact), in a graph of 11,751 types and 243,439 connections. Six removal orders were pre-registered and applied in adaptive batches.[^albert] Removing types by output synapses halves routing after 4.1% are gone, against 28.3% at random, and routes thin out long before anything disconnects. The degree-preserving null model that tests whether the real wiring is more fragile than chance is still computing.
+HHMI Janelia and Google Research have released a complete wiring diagram of an adult male fruit fly's central nervous system, brain and nerve cord together.[^berg] We asked how much of it has to be removed before sensory input can no longer reach motor output, and whether the order of removal matters. Percolation on the FlyWire brain connectome has tracked its largest connected components;[^lin] here the measure is directed routing, the number of edge-disjoint paths from 368 sensory to 665 descending and motor cell types (10,647 when intact), in a graph of 11,751 types and 243,439 connections. Six removal orders were pre-registered and applied in adaptive batches.[^albert] Removing types by output synapses halves routing after 4.1% are gone, against 28.3% at random, and routes thin out long before anything disconnects. Against 200 degree-preserving randomizations of the graph, the real wiring is significantly more fragile under all six orders (one-sided p = 0.005 each, Bonferroni-corrected threshold 0.0083).
 
 ## Results
 
@@ -22,7 +22,7 @@ HHMI Janelia and Google Research have released a complete wiring diagram of an a
 - [x] Fourteen behaviorally validated cell types rank above other types in sensory-motor betweenness (one-sided p = 0.045; p = 0.10 with the positive control MN9)
 - [x] For 205 of 4,449 informative bilateral types, removing both sides costs more than the sum of each side (one-sided p = 5.2 × 10⁻³⁷); 4,235 are exactly additive
 - [ ] Structural cascades follow a power law (not established: plausible in the primary pooling, p = 0.202, rejected in the sensitivity pooling, p = 0.036; see [where it falls short](#where-it-falls-short))
-- [ ] The real graph is more fragile than 200 degree-preserving randomized graphs (still computing; see [the null model](#the-null-model))
+- [x] The real graph is more fragile than 200 degree-preserving randomized graphs under all six orders (one-sided p = 0.005 each, threshold 0.0083; see [the null model](#the-null-model))
 
 <details>
 <summary>All headline values</summary>
@@ -39,8 +39,9 @@ HHMI Janelia and Google Research have released a complete wiring diagram of an a
 | largest single cascade | 6,046 types |
 | flow halves, strongest connections first / random connections | 26.8% / 47.6% of connections |
 | curated behavioral types, sensory-motor betweenness | one-sided p = 0.045, AUC 0.630 |
+| orders significantly more fragile than 200 degree-preserving randomizations | 6 of 6 (one-sided, Bonferroni threshold 0.0083) |
 
-<sub>Source: <a href="results/fragility_scores.json">results/fragility_scores.json</a>, <a href="results/critical_thresholds.json">results/critical_thresholds.json</a>, <a href="results/type_atlas.json">results/type_atlas.json</a>, <a href="results/edge_attack.json">results/edge_attack.json</a>, <a href="results/literature_validation.json">results/literature_validation.json</a></sub>
+<sub>Source: <a href="results/fragility_scores.json">results/fragility_scores.json</a>, <a href="results/critical_thresholds.json">results/critical_thresholds.json</a>, <a href="results/type_atlas.json">results/type_atlas.json</a>, <a href="results/edge_attack.json">results/edge_attack.json</a>, <a href="results/literature_validation.json">results/literature_validation.json</a>, <a href="results/null_model_summary.json">results/null_model_summary.json</a></sub>
 
 </details>
 
@@ -277,15 +278,29 @@ Mann-Whitney U tests against all other types. Percentiles are mid-rank, so 9.8 i
 
 ## The null model
 
-> [!NOTE]
-> The degree-preserving null model is still computing, and no result from it is reported yet. When it finishes, this section will give the null distributions, z-scores and p-values for all six orders, whatever they show.
+The pre-registered hypothesis, restated before any randomized graph was scored, is directional: for each removal order, the real graph's flow-capacity AUC is lower, that is more fragile, than that of degree-preserving randomized graphs under the same order. Each of 200 randomized graphs is the real type graph after 10 × |E| edge swaps that keep every type's in-degree and out-degree,[^maslov] with each type's outgoing synapse counts shuffled onto its new edges so that out-strength is kept too. Every randomized graph receives the full protocol, including 30 random-removal trials, and each order is tested with the one-sided empirical p-value below at a Bonferroni-corrected threshold of 0.05 / 6 = 0.0083. With 200 graphs the smallest attainable p is 1/201 = 0.005. The plan and the full results, including the secondary test on reachable pairs, are in [null_model_validation.md](results/null_model_validation.md).
 
-The pre-registered hypothesis, restated before any randomized graph was scored, is directional: for each removal order, the real graph's flow-capacity AUC is lower, that is more fragile, than that of degree-preserving randomized graphs under the same order. Each of 200 randomized graphs is the real type graph after 10 × |E| edge swaps that keep every type's in-degree and out-degree,[^maslov] with each type's outgoing synapse counts shuffled onto its new edges so that out-strength is kept too. Every randomized graph receives the full protocol, including 30 random-removal trials, and each order is tested with the one-sided empirical p-value below at a Bonferroni-corrected threshold of 0.05 / 6 = 0.0083. With 200 graphs the smallest attainable p is 1/201 = 0.005. The plan is in [null_model_validation.md](results/null_model_validation.md).
+**Result.** Under all six orders the real graph's flow-capacity AUC is significantly lower than that of its 200 randomizations (p = 0.005 each), so its fragility does not follow from the degree sequence alone. The test does not say which further features of the wiring produce it. Where no randomized graph scored at or below the real one, p is the floor of 1/201, and the z-scores in the table show how far outside the randomized range the real value lies.
+
+| order | real AUC | randomized mean ± SD | at or below real | z | p | result |
+|---|---:|---:|---:|---:|---:|---|
+| random | 0.570 | 0.575 ± 0.0005 | 0 / 200 | −11.5 | 0.005 | significant |
+| weighted out-degree | 0.197 | 0.202 ± 0.0014 | 0 / 200 | −3.6 | 0.005 | significant |
+| weighted in-degree | 0.370 | 0.593 ± 0.0099 | 0 / 200 | −22.7 | 0.005 | significant |
+| betweenness | 0.315 | 0.345 ± 0.0034 | 0 / 200 | −8.9 | 0.005 | significant |
+| PageRank | 0.441 | 0.590 ± 0.0080 | 0 / 200 | −18.7 | 0.005 | significant |
+| sensory-motor betweenness | 0.233 | 0.353 ± 0.0118 | 0 / 200 | −10.1 | 0.005 | significant |
+
+The secondary test on reachable pairs is significant under four of the six orders.
+
+<p><img src="results/null_distribution.png" width="880" alt="Six histograms, one per removal order, of the flow-capacity AUC of 200 degree-preserving randomized graphs, each with a vertical line at the real graph's AUC. The real graph is significantly more fragile under all six orders."></p>
+
+<sub>Source: <a href="results/null_model_summary.json">results/null_model_summary.json</a>, <a href="results/null_model_scores.csv">results/null_model_scores.csv</a></sub>
 
 ## Where it falls short
 
 > [!CAUTION]
-> Two pre-specified checks are not met. Structural cascades were to be tested for a power law, and one is not established: the fit is plausible in the pre-registered pooling (bootstrap p = 0.202) but rejected when all 30 random trials are pooled (p = 0.036), and a lognormal cannot be distinguished in either. The degree-preserving null model, the test of whether the real wiring is more fragile than chance, is still computing, so that check is still open. Both are reported as they stand.
+> One pre-specified check is not met. Structural cascades were to be tested for a power law, and one is not established: the fit is plausible in the pre-registered pooling (bootstrap p = 0.202) but rejected when all 30 random trials are pooled (p = 0.036), and a lognormal cannot be distinguished in either. It is reported as it stands.
 
 <p><a href="https://dhruvin-sarkar.github.io/fault-lines/#avalanches"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/readme/fig-avalanches-dark.svg"><img src="assets/readme/fig-avalanches-light.svg" width="880" alt="Figure 8. Log-log plot of the share of structural cascades at least a given size, for the primary pooling of one run per removal order (229 positive sizes) and the sensitivity pooling with all 30 random trials (342 positive sizes), each with its fitted discrete power law. Primary: exponent 2.011 above size 8, bootstrap p = 0.202, plausible. Sensitivity: exponent 1.872 above size 4, bootstrap p = 0.036, rejected. Against a lognormal the likelihood ratio is not significant in either pooling (p = 0.314 and 0.752). The largest cascade is 6,046 types."></picture></a></p>
 
@@ -295,6 +310,7 @@ The pre-registered hypothesis, restated before any randomized graph was scored, 
 - **Cell-type aggregation:** a type of one neuron counts the same as a type of thousands. The eleven visual sensory types hold 6,098 neurons but contribute few sources.
 - **The 1% input threshold:** it caps in-degree at 100 partner types and decides which weak routes exist. It was fixed in advance and no alternative was tested.
 - **Unit capacities:** flow counts routes, not synapses. A weighted capacity would give different values.
+- **What the null model keeps:** the randomized graphs keep every type's in-degree, out-degree and output synapse total, not its input synapse total or any structure beyond degrees. The test can show that degrees alone do not explain the fragility; it cannot show which feature of the wiring does.
 - **Terminal definitions:** the sensory and motor sets follow neuPrint superclass annotations, and removing a region or class that holds terminals deletes sources or sinks by construction.
 - **Single runs:** each targeted order is deterministic apart from tie-breaking and was run once.
 - **Exploratory analyses:** the full single-type removal table, disconnection across the type population, regional and superclass removal, the structural profile, the edge attack and the published-threshold comparison were added after the pre-registration, and the p-values among them are uncorrected.
@@ -344,7 +360,7 @@ The live site is an illustrated version of everything above, with every removal 
 
 ## Methods
 
-<p><a href="https://dhruvin-sarkar.github.io/fault-lines/#methods"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/readme/methods-pipeline-dark.svg"><img src="assets/readme/methods-pipeline-light.svg" width="880" alt="The analysis pipeline in eight steps: 1 data, 164,506 typed neurons from neuPrint male-cns:v1.0; 2 type graph, 243,439 edges between 11,751 cell types; 3 terminals, 368 sensory and 665 descending or motor types; 4 pre-registration, committed as 0e72491 before any removal; 5 removal, six adaptive orders in batches of 1%; 6 thresholds, flow halves after 4.1% against 28.3% at random; 7 null model, 200 degree-preserving rewired graphs, still computing; 8 follow-up analyses of regions, superclasses and connections."></picture></a></p>
+<p><a href="https://dhruvin-sarkar.github.io/fault-lines/#methods"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/readme/methods-pipeline-dark.svg"><img src="assets/readme/methods-pipeline-light.svg" width="880" alt="The analysis pipeline in eight steps: 1 data, 164,506 typed neurons from neuPrint male-cns:v1.0; 2 type graph, 243,439 edges between 11,751 cell types; 3 terminals, 368 sensory and 665 descending or motor types; 4 pre-registration, committed as 0e72491 before any removal; 5 removal, six adaptive orders in batches of 1%; 6 thresholds, flow halves after 4.1% against 28.3% at random; 7 null model, 200 degree-preserving rewired graphs, complete; 8 follow-up analyses of regions, superclasses and connections."></picture></a></p>
 
 1. **Data.** The male CNS connectome, `male-cns:v1.0`, queried through neuPrint.[^plaza] The database holds 176,422 neuron records, of which 164,506 carry one of 11,751 cell types.
 2. **Type graph.** Neuron-to-neuron synapse counts are summed into type-to-type counts $w(u \to v)$. An edge is kept when it supplies at least 1% of the target type's input, and self-loops are dropped, which leaves 243,439 directed edges:

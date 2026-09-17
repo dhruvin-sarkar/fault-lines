@@ -997,6 +997,22 @@ def mini_stack(sheet: Sheet, x0, x1, y, parts) -> None:
                    "sans", INK_3, ha="left" if i == 0 else "right" if i == 2 else "center")
 
 
+def mini_pvalues(sheet: Sheet, x0, x1, y, strategies: dict, alpha: float, floor: float) -> None:
+    """One-sided p per strategy on a log axis, one row each, with the corrected threshold dashed."""
+    sx = linear(np.log10(floor / 1.6), 0, x0 + 8, x1 - 8)
+    ax = float(sx(np.log10(alpha)))
+    sheet.rect(x0, y - 6, ax, y + 90, WASH, zorder=1)
+    sheet.line([ax, ax], [y - 10, y + 90], INK, 2, dashes=(6, 5), zorder=4)
+    for i, (strategy, tests) in enumerate(strategies.items()):
+        cy = y + 4 + i * 15
+        sheet.line([x0, x1], [cy, cy], RULE, 1.5, zorder=2)
+        sheet.dot(float(sx(np.log10(tests["auc_flow"]["p_value"]))), cy, 7, STRATEGY_COLORS[strategy],
+                  hollow=strategy == "random", stroke=3, zorder=7)
+    sheet.line([x0, x1], [y + 90, y + 90], RULE_STRONG, 2)
+    for t, label in ((np.log10(alpha), f"{alpha:.4f}"), (0.0, "1")):
+        sheet.text(float(sx(t)), y + 124, label, TICK, "sans", INK_3, ha="center")
+
+
 def mini_pending(sheet: Sheet, x0, x1, y) -> None:
     sheet.line([x0, x1, x1, x0, x0], [y, y, y + 90, y + 90, y], RULE_STRONG, 2, dashes=(8, 8))
     sheet.text((x0 + x1) / 2, y + 56, "running", LABEL, "sans_medium", INK_3, ha="center")
@@ -1183,10 +1199,12 @@ def draw_checks(sheet: Sheet, data: dict) -> float:
     if nm:
         strategies = nm["strategies"]
         significant = sum(1 for s in strategies.values() if s["auc_flow"]["significant"])
+        floor = 1 / (nm["n_nulls"] + 1)
         cells.append(("Against randomized graphs", f"{significant} of {len(strategies)}",
-                      lambda a, b, t: None,
-                      f"removal orders find the real graph more fragile than {nm['n_nulls']} degree-preserving "
-                      f"randomizations at a Bonferroni-corrected alpha of {nm['alpha']:.4f}."))
+                      lambda a, b, t: mini_pvalues(sheet, a, b, t, strategies, nm["alpha"], floor),
+                      f"removal orders with flow AUC significantly below {nm['n_nulls']} degree-preserving "
+                      f"randomizations. Dots: one-sided p per order; dashed: 0.05 / 6; lowest possible p "
+                      f"{floor:.3f}."))
     else:
         cells.append(("Against randomized graphs", "In progress", lambda a, b, t: mini_pending(sheet, a, b, t),
                       f"{data['planned_nulls']} degree-preserving randomized graphs are going through the same "

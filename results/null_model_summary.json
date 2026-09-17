@@ -1,0 +1,150 @@
+{
+  "n_nulls": 200,
+  "alpha": 0.008333333333333333,
+  "strategies": {
+    "random": {
+      "auc_flow": {
+        "real": 0.5698788123350099,
+        "null_mean": 0.5751453718912878,
+        "null_sd": 0.0004599567524524254,
+        "null_min": 0.5740302688772838,
+        "null_max": 0.5763091053487642,
+        "n_at_or_below_real": 0,
+        "z_score": -11.450119012705647,
+        "p_value": 0.004975124378109453,
+        "significant": true
+      },
+      "auc_reachability": {
+        "real": 0.5859891108693279,
+        "null_mean": 0.5858939705543205,
+        "null_sd": 0.00030806019003694704,
+        "null_min": 0.58502784999794,
+        "null_max": 0.5866817534040507,
+        "n_at_or_below_real": 115,
+        "z_score": 0.30883677308660856,
+        "p_value": 0.5771144278606966,
+        "significant": false
+      }
+    },
+    "out_strength": {
+      "auc_flow": {
+        "real": 0.19713953444169038,
+        "null_mean": 0.2023311630241299,
+        "null_sd": 0.0014401140628829629,
+        "null_min": 0.19779903775739766,
+        "null_max": 0.20704415834423082,
+        "n_at_or_below_real": 0,
+        "z_score": -3.6050120724787598,
+        "p_value": 0.004975124378109453,
+        "significant": true
+      },
+      "auc_reachability": {
+        "real": 0.3494679130175177,
+        "null_mean": 0.3571929882589329,
+        "null_sd": 0.0028156811027076974,
+        "null_min": 0.348566830092258,
+        "null_max": 0.3653567091863177,
+        "n_at_or_below_real": 1,
+        "z_score": -2.74359025742881,
+        "p_value": 0.009950248756218905,
+        "significant": false
+      }
+    },
+    "in_strength": {
+      "auc_flow": {
+        "real": 0.3696187570218704,
+        "null_mean": 0.5929572677098753,
+        "null_sd": 0.009850176663639717,
+        "null_min": 0.5590742286039881,
+        "null_max": 0.6213201908752299,
+        "n_at_or_below_real": 0,
+        "z_score": -22.673553816798208,
+        "p_value": 0.004975124378109453,
+        "significant": true
+      },
+      "auc_reachability": {
+        "real": 0.4840261662845093,
+        "null_mean": 0.6384510137597454,
+        "null_sd": 0.013793511527634658,
+        "null_min": 0.5990930652754886,
+        "null_max": 0.671072505119522,
+        "n_at_or_below_real": 0,
+        "z_score": -11.195470215532366,
+        "p_value": 0.004975124378109453,
+        "significant": true
+      }
+    },
+    "betweenness": {
+      "auc_flow": {
+        "real": 0.3151036570628833,
+        "null_mean": 0.34513084835740393,
+        "null_sd": 0.003370184631827162,
+        "null_min": 0.33383936082725807,
+        "null_max": 0.3536177897399772,
+        "n_at_or_below_real": 0,
+        "z_score": -8.909657652269708,
+        "p_value": 0.004975124378109453,
+        "significant": true
+      },
+      "auc_reachability": {
+        "real": 0.2674031559234506,
+        "null_mean": 0.4996917152941748,
+        "null_sd": 0.006344487709443204,
+        "null_min": 0.4820538584880006,
+        "null_max": 0.514106961738303,
+        "n_at_or_below_real": 0,
+        "z_score": -36.61265810712871,
+        "p_value": 0.004975124378109453,
+        "significant": true
+      }
+    },
+    "pagerank": {
+      "auc_flow": {
+        "real": 0.4406055555277206,
+        "null_mean": 0.5902204095842638,
+        "null_sd": 0.007979471580758724,
+        "null_min": 0.5662510519243117,
+        "null_max": 0.6074213803097145,
+        "n_at_or_below_real": 0,
+        "z_score": -18.749970163101594,
+        "p_value": 0.004975124378109453,
+        "significant": true
+      },
+      "auc_reachability": {
+        "real": 0.4611564912965499,
+        "null_mean": 0.6404218199370055,
+        "null_sd": 0.011886045546005537,
+        "null_min": 0.607782608742949,
+        "null_max": 0.6769898005104266,
+        "n_at_or_below_real": 0,
+        "z_score": -15.081999134750086,
+        "p_value": 0.004975124378109453,
+        "significant": true
+      }
+    },
+    "sm_betweenness": {
+      "auc_flow": {
+        "real": 0.2326085900175654,
+        "null_mean": 0.3525050138149979,
+        "null_sd": 0.01183093006239658,
+        "null_min": 0.32194986435198497,
+        "null_max": 0.39465041439441695,
+        "n_at_or_below_real": 0,
+        "z_score": -10.134150330117427,
+        "p_value": 0.004975124378109453,
+        "significant": true
+      },
+      "auc_reachability": {
+        "real": 0.2555312704876059,
+        "null_mean": 0.3708869077237168,
+        "null_sd": 0.00892386026242763,
+        "null_min": 0.34550708914966666,
+        "null_max": 0.39935937307537034,
+        "n_at_or_below_real": 0,
+        "z_score": -12.926652126299631,
+        "p_value": 0.004975124378109453,
+        "significant": true
+      }
+    }
+  }
+}

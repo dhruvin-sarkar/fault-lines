@@ -202,7 +202,7 @@ def write_report(summary: dict, graph: ig.Graph, n_nulls: int) -> None:
         s = summary[strategy][metric]
         return (
             f"| {STRATEGY_LABELS[strategy]} | {s['real']:.4f} | {s['null_mean']:.4f} ± {s['null_sd']:.4f} | "
-            f"{s['null_min']:.4f} – {s['null_max']:.4f} | {s['n_at_or_below_real']} / {n_nulls} | {s['z_score']:.1f} | "
+            f"{s['null_min']:.4f} to {s['null_max']:.4f} | {s['n_at_or_below_real']} / {n_nulls} | {s['z_score']:.1f} | "
             f"{s['p_value']:.4f} | {'yes' if s['significant'] else 'no'} |"
         )
 
