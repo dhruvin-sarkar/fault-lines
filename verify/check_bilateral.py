@@ -2,9 +2,9 @@
 
 import pandas as pd
 
-from pipeline.bilateral_symmetry import wilcoxon_greater
+from pipeline.bilateral_symmetry import report_lines, wilcoxon_greater
 from pipeline.common import RESULTS
-from verify.common import Skip, first_difference, result_json, result_text, run
+from verify.common import Skip, first_difference, result_json, result_text, run, same_text
 
 IMPACTS = ["impact_left", "impact_right", "impact_both"]
 
@@ -56,6 +56,7 @@ def check() -> str:
     assert f"For each of the {summary['bilateral_types']} types" in text, "Report states a different number of types"
     assert (f"Of the {summary['informative_types']} informative types, {counts['superadditive']} are superadditive"
             in text), "Report states different additivity counts"
+    assert same_text(text, "\n".join(report_lines(summary))), "bilateral_symmetry.md is out of date with the JSON"
     p = summary["both_greater_than_sum_of_singles"]["p_value"]
     return (f"{summary['bilateral_types']:,} bilateral types, {summary['informative_types']:,} informative "
             f"({counts['superadditive']} superadditive, {counts['subadditive']} subadditive); both Wilcoxon tests "

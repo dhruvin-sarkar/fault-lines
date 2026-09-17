@@ -22,6 +22,9 @@ const CLASSES = [
 
 const SIDES = { L: "left", R: "right", M: "on the midline", unknown: "without a recorded side" };
 
+/** A signed-rank statistic exactly; W can be a half-integer when ranks are tied. */
+const statistic = (w) => (w == null ? "n/a" : w.toLocaleString("en-US", { maximumFractionDigits: 1 }));
+
 export default function Bilateral({ types }) {
   const { data, missing } = useResult("bilateral.json");
   if (missing) return <Pending id={ID} title={TITLE} />;
@@ -40,7 +43,14 @@ function BilateralView({ data, types }) {
   const additiveShare = informative ? (counts.additive ?? 0) / informative : null;
   const maxSuper = strongest.length ? Math.max(...strongest.map((r) => r.superadditivity)) : null;
   const top = strongest.find((r) => r.superadditivity === maxSuper);
-  const sensoryTop = strongest.filter((r) => index.has(r.cell_type) && types.role[index.get(r.cell_type)] === SENSORY).length;
+  // The listed types can end partway through a tie, so the share of sensory types is taken above the lowest listed value.
+  const floorSuper = strongest.length ? Math.min(...strongest.map((r) => r.superadditivity)) : null;
+  const aboveFloor = strongest.filter((r) => r.superadditivity > floorSuper);
+  const ranked = aboveFloor.length ? aboveFloor : strongest;
+  const sensoryTop = ranked.filter((r) => index.has(r.cell_type) && types.role[index.get(r.cell_type)] === SENSORY).length;
+  const rankedLabel = aboveFloor.length
+    ? `types with an excess of ${count(floorSuper + 1)} routes or more`
+    : "most superadditive types listed";
   const describe = (name) => {
     const i = index.get(name);
     return i == null ? null : sentence(superclassName(types.superclasses[types.superclass[i]]));
@@ -94,7 +104,7 @@ function BilateralView({ data, types }) {
             {count(maxSuper)} routes, for <span className="id">{top.cell_type}</span>, whose two copies cost{" "}
             {count(top.impact_left)} and {count(top.impact_right)} alone and {count(top.impact_both)} together.{" "}
             {types &&
-              `${count(sensoryTop)} of the ${count(strongest.length)} most superadditive types are sensory, the same pattern as the pairs above: sensory types are where flow enters, and when one copy goes the other fills downstream capacity it leaves unused.`}
+              `${count(sensoryTop)} of the ${count(ranked.length)} ${rankedLabel} are sensory, the same pattern as the pairs above: sensory types are where flow enters, and when one copy goes the other fills downstream capacity it leaves unused.`}
           </p>
         )}
       </TextBlock>
@@ -145,7 +155,7 @@ function BilateralView({ data, types }) {
               </span>
               <span className="fc-stats">
                 One-sided Wilcoxon signed-rank test over the {count(single.pairs_differing)} types whose values differ: W ={" "}
-                {count(single.statistic)}, <PValue p={single.p_value} />
+                {statistic(single.statistic)}, <PValue p={single.p_value} />
               </span>
             </dd>
           </div>
@@ -159,7 +169,7 @@ function BilateralView({ data, types }) {
               </span>
               <span className="fc-stats">
                 One-sided Wilcoxon signed-rank test over the {count(sum.pairs_differing)} types whose values differ: W ={" "}
-                {count(sum.statistic)}, <PValue p={sum.p_value} />
+                {statistic(sum.statistic)}, <PValue p={sum.p_value} />
               </span>
             </dd>
           </div>

@@ -13,12 +13,16 @@
   "both_greater_than_single_mean": {
     "pairs_differing": 4449,
     "statistic": 9899025.0,
-    "p_value": 0.0
+    "p_value": 0.0,
+    "z_statistic": 57.822681313417,
+    "log10_p_value": -728.1849694711084
   },
   "both_greater_than_sum_of_singles": {
     "pairs_differing": 214,
     "statistic": 22235.5,
-    "p_value": 5.1717564951885865e-37
+    "p_value": 5.1717564951885865e-37,
+    "z_statistic": 12.656160944562938,
+    "log10_p_value": -36.28636193144931
   },
   "additivity_counts": {
     "superadditive": 205,
