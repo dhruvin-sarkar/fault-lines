@@ -19,3 +19,13 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+This license covers the code in this repository. The male CNS connectome data
+(neuPrint dataset male-cns:v1.0) is published by HHMI Janelia Research Campus
+under the Creative Commons Attribution 4.0 license
+(https://creativecommons.org/licenses/by/4.0/). Derived data files in this
+repository (results/ and web/public/data/) inherit that attribution
+requirement: cite Berg et al. (2026), Cell 189(18):5504-5526,
+doi:10.1016/j.cell.2026.08.015.
