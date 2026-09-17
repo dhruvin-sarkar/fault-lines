@@ -13,7 +13,7 @@ from verify.common import Skip, data_available, first_difference, read_json, res
 # Sections rebuilt from committed results alone; types.json and compartments.json also read the local data cache.
 DATA_FREE = ("meta.json", "percolation.json", "atlas.json", "regions.json", "nulls.json", "literature.json",
              "avalanches.json", "comparison.json", "structure.json", "edges.json", "pairs.json", "bilateral.json",
-             "bottleneck.json")
+             "bottleneck.json", "pair_loss.json")
 
 
 def roundtrip(value):

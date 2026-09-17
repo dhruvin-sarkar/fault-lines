@@ -15,6 +15,7 @@ from pipeline.brain_vnc_comparison import RUNS_ROOT as COMPARTMENT_RUNS
 from pipeline.build_type_graph import MIN_INPUT_FRACTION, load_type_graph
 from pipeline.common import ASSETS, RESULTS, TYPE_NODES_PATH, WEB_DATA
 from pipeline.figures import STRATEGY_COLORS
+from pipeline.null_model import N_NULLS
 from pipeline.removal_strategies import STRATEGIES, STRATEGY_LABELS
 from pipeline.run_percolation import CURVES_CSV, RANDOM_TRIALS
 
@@ -93,13 +94,67 @@ def percolation() -> dict:
             "intact_reachable_pairs": scores["graph"]["intact_reachable_pairs"], "strategies": out}
 
 
-def nulls() -> dict:
-    summary = read_json("null_model_summary.json")
-    scores = pd.read_csv(RESULTS / "null_model_scores.csv")
-    samples = {s: {m: rounded(rows[m], 4) for m in ("auc_flow", "auc_reachability")}
-               for s, rows in scores.groupby("strategy")}
-    return {"n_nulls": summary["n_nulls"], "alpha": summary["alpha"], "strategies": summary["strategies"],
-            "samples": samples}
+NULL_METRICS = ("auc_flow", "auc_reachability")
+NULL_BINS = 24
+NULL_QUANTILES = (0.025, 0.25, 0.5, 0.75, 0.975)
+
+
+def sig(value: float, figures: int = 6) -> float:
+    """``value`` rounded to ``figures`` significant figures, so narrow null spreads keep their precision."""
+    return float(f"{float(value):.{figures}g}")
+
+
+def null_verdict(test: dict) -> str:
+    """Reading of one one-sided null-model test, in the terms the pre-registration allows.
+
+    Parameters: ``test`` is one strategy and metric entry of null_model_summary.json.
+    Returns ``"more_fragile"`` when p is below the corrected threshold, ``"above_null_mean"`` when it is not and the
+    real AUC lies above the randomized mean, and ``"not_significant"`` otherwise.
+    """
+    if test["significant"]:
+        return "more_fragile"
+    return "above_null_mean" if test["real"] > test["null_mean"] else "not_significant"
+
+
+def null_distribution(values, bins: int = NULL_BINS) -> dict:
+    """Equal-width histogram and quantiles of the randomized-graph AUCs for one strategy and metric.
+
+    Parameters: ``values`` are the per-graph AUCs. Returns ``lo`` and ``step`` (bin ``i`` covers
+    ``[lo + i * step, lo + (i + 1) * step)``, the last bin closed), ``counts`` per bin, and ``quantiles`` at
+    ``NULL_QUANTILES``.
+    """
+    values = np.asarray(values, dtype=float)
+    lo, hi = float(values.min()), float(values.max())
+    if hi <= lo:
+        lo, hi = lo - 0.0005, hi + 0.0005
+    counts, _ = np.histogram(values, bins=bins, range=(lo, hi))
+    return {"lo": sig(lo), "step": sig((hi - lo) / bins), "counts": counts.astype(int).tolist(),
+            "quantiles": [sig(q) for q in np.quantile(values, NULL_QUANTILES)]}
+
+
+def nulls(results=None) -> dict:
+    """The null-model tests with a compact distribution per strategy and metric.
+
+    Parameters: ``results`` is the folder holding null_model_summary.json and null_model_scores.csv (default
+    ``RESULTS``). Returns the ensemble size, the pre-registered size, the threshold, the p-value floor and, per
+    strategy and metric, the summary statistics, the verdict and the distribution.
+    """
+    folder = RESULTS if results is None else results
+    summary = json.loads((folder / "null_model_summary.json").read_text(encoding="utf-8"))
+    scores = pd.read_csv(folder / "null_model_scores.csv")
+    n = summary["n_nulls"]
+    strategies = {}
+    for strategy in STRATEGIES:
+        values = scores[scores["strategy"] == strategy]
+        strategies[strategy] = {}
+        for metric in NULL_METRICS:
+            test = summary["strategies"][strategy][metric]
+            entry = {key: sig(v) if isinstance(v, float) else v for key, v in test.items()}
+            entry["verdict"] = null_verdict(test)
+            entry["distribution"] = null_distribution(values[metric])
+            strategies[strategy][metric] = entry
+    return {"n_nulls": n, "n_preregistered": N_NULLS, "alpha": summary["alpha"], "p_floor": sig(1 / (n + 1)),
+            "quantiles": list(NULL_QUANTILES), "strategies": strategies}
 
 
 def atlas() -> dict:
@@ -195,6 +250,26 @@ def comparison() -> list[dict]:
     return pd.read_csv(RESULTS / "network_comparison.csv").to_dict(orient="records")
 
 
+PAIR_LIMIT = 12
+
+
+def pair_loss() -> dict:
+    """Pairs between two other types that each type disconnects, for types that disconnect any.
+
+    Sources keep the result's order (most motor types lost first) and motors theirs (descending neurons first, then
+    by name); each list is cut to ``PAIR_LIMIT`` with the full count kept alongside.
+    """
+    report = read_json("pair_loss.json")
+    table = pd.read_csv(RESULTS / "pair_loss.csv").set_index("cell_type")
+    out = {}
+    for name, groups in report["types"].items():
+        out[name] = {"own": int(table.at[name, "own_pairs"]), "other": int(table.at[name, "other_pairs"]),
+                     "sources_total": len(groups),
+                     "sources": [{"sensory": g["sensory"], "reach": g["reach"], "lost": len(g["motors"]),
+                                  "motors": g["motors"][:PAIR_LIMIT]} for g in groups[:PAIR_LIMIT]]}
+    return {"limit": PAIR_LIMIT, "types_with_pairs_lost": report["types_with_pairs_lost"], "types": out}
+
+
 SECTIONS = {
     "meta.json": (meta, ("fragility_scores.json", "sensory_motor_sets.json")),
     "percolation.json": (percolation, ("percolation_curves.csv", "fragility_scores.json", "critical_thresholds.json")),
@@ -211,6 +286,7 @@ SECTIONS = {
     "pairs.json": (lambda: read_json("synthetic_lethal_pairs.json"), ("synthetic_lethal_pairs.json",)),
     "bilateral.json": (lambda: read_json("bilateral_symmetry.json"), ("bilateral_symmetry.json",)),
     "bottleneck.json": (lambda: read_json("hidden_bottleneck.json"), ("hidden_bottleneck.json",)),
+    "pair_loss.json": (pair_loss, ("pair_loss.json", "pair_loss.csv")),
 }
 
 
@@ -224,6 +300,20 @@ def copy_figures() -> list[str]:
             shutil.copyfile(path, destination / path.name)
             copied.append(path.name)
     return copied
+
+
+# A long computation writes this file last; until it exists its section is skipped without failing the export.
+AWAITED = {"nulls.json": "null_model_summary.json"}
+
+
+def split_missing(missing: dict[str, list[str]]) -> tuple[list[str], dict[str, list[str]]]:
+    """Separate skipped sections that await an unfinished computation from those with missing inputs.
+
+    Parameters: ``missing`` maps a section to its absent input files. Returns the sections whose absent inputs
+    include their awaited file, and the remaining sections with their absent inputs.
+    """
+    pending = [name for name, absent in missing.items() if AWAITED.get(name) in absent]
+    return pending, {name: absent for name, absent in missing.items() if name not in pending}
 
 
 def main() -> None:
@@ -245,8 +335,11 @@ def main() -> None:
     (WEB_DATA / "manifest.json").write_text(
         json.dumps({"available": sorted(set(SECTIONS) - set(missing))}) + "\n", encoding="utf-8")
     print(f"figures copied: {len(copy_figures())}")
-    if missing:
-        for name, absent in missing.items():
+    pending, failed = split_missing(missing)
+    for name in pending:
+        print(f"PENDING {name}: {AWAITED[name]} not written yet, section skipped")
+    if failed:
+        for name, absent in failed.items():
             print(f"SKIPPED {name}: missing {', '.join(absent)}", file=sys.stderr)
         if not args.allow_missing:
             sys.exit(1)

@@ -3,10 +3,12 @@ import Atlas, { FIELD_LIVE, atlasAspect } from "./Atlas.jsx";
 import { ChartFrame, Row, Tooltip } from "./Chart.jsx";
 import { Figure } from "./ui.jsx";
 import { useWidth } from "../lib/hooks.js";
-import { count, percent, sentence, strategyLabel, superclassName } from "../lib/format.js";
+import { useAvailable, useData } from "../lib/data.js";
+import { count, percent, sentence, signedCount, strategyLabel, superclassName } from "../lib/format.js";
 import { useRovingRows } from "./findings/useRovingRows.js";
 import { linear } from "../lib/scales.js";
 import "../styles/findings-c.css";
+import "../styles/lookup-pairs.css";
 
 const LIMIT = 8;
 const PICKS = 8;
@@ -333,19 +335,22 @@ export default function Lookup({ meta, percolation, types, atlas }) {
 
 function Profile({ index, meta, percolation, types, ranking }) {
   const name = types.name[index];
-  const intact = meta.graph.intact_flow;
-  const reachable = meta.graph.intact_reachable_pairs;
-  const drop = types.flow_drop[index];
-  const rank = ranking.above.get(drop) + 1;
-  const tied = ranking.tied.get(drop);
   const anchor = types.anchor[index];
   const role = ROLES[types.role[index]];
   const neurons = types.neurons[index];
+  const heading = useRef(null);
+  const followed = useRef(false);
+
+  useEffect(() => {
+    if (!followed.current) return;
+    followed.current = false;
+    heading.current?.focus();
+  }, [index]);
 
   return (
     <article className="fc-profile" aria-labelledby="lookup-profile-name">
       <header>
-        <h3 id="lookup-profile-name" className="fc-profile-name">
+        <h3 id="lookup-profile-name" className="fc-profile-name" ref={heading} tabIndex={-1}>
           {name}
         </h3>
         <p className="fc-profile-meta">
@@ -383,29 +388,17 @@ function Profile({ index, meta, percolation, types, ranking }) {
           <dt>Output synapses, within the graph</dt>
           <dd>{count(types.out_strength[index])}</dd>
         </div>
-        <div>
-          <dt>Routes lost when removed alone, of {count(intact)}</dt>
-          <dd>{count(drop)}</dd>
-        </div>
-        <div>
-          <dt>Sensory-motor pairs disconnected when removed alone, of {count(reachable)}</dt>
-          <dd>{count(types.pairs_lost[index])}</dd>
-        </div>
       </dl>
 
-      <p className="caption fc-profile-note">
-        {drop > 0 ? (
-          <>
-            Removing it alone costs {percent(drop / intact, 2)} of flow capacity, rank {count(rank)} of{" "}
-            {count(types.name.length)}
-            {tied > 1 ? `, tied with ${count(tied - 1)} other ${tied === 2 ? "type" : "types"}` : ""}.
-          </>
-        ) : (
-          <>
-            Like {count(tied - 1)} other types, removing it alone leaves all {count(intact)} routes in place.
-          </>
-        )}
-      </p>
+      <Removal
+        index={index}
+        meta={meta}
+        types={types}
+        ranking={ranking}
+        onFollow={() => {
+          followed.current = true;
+        }}
+      />
 
       <div>
         <div className="fc-timing-head">
@@ -441,6 +434,174 @@ function Profile({ index, meta, percolation, types, ranking }) {
         </p>
       </div>
     </article>
+  );
+}
+
+const OWN_PAIRS = { 1: "as a sensory source", 2: "as a motor target" };
+
+function TypeLink({ name, onFollow }) {
+  return (
+    <a className="lk-type" href={`${HASH}${encodeURIComponent(name)}`} onClick={onFollow}>
+      <span className="id">{name}</span>
+    </a>
+  );
+}
+
+function Change({ value }) {
+  return value > 0 ? (
+    <span className="lk-change">{signedCount(-value)}</span>
+  ) : (
+    <span className="lk-change is-none">no change</span>
+  );
+}
+
+/** Flow capacity and reachable pairs with and without the type, and the pairs whose last route runs through it. */
+function Removal({ index, meta, types, ranking, onFollow }) {
+  const name = types.name[index];
+  const intact = meta.graph.intact_flow;
+  const reachable = meta.graph.intact_reachable_pairs;
+  const drop = types.flow_drop[index];
+  const lost = types.pairs_lost[index];
+  const rank = ranking.above.get(drop) + 1;
+  const tied = ranking.tied.get(drop);
+  const available = useAvailable();
+  const listed = Boolean(available?.has("pair_loss.json"));
+  const { data, error } = useData(lost > 0 && listed ? "pair_loss.json" : null);
+
+  return (
+    <div className="lk-removal">
+      <div className="fc-timing-head">
+        <h4 className="fc-timing-title">What removing it alone breaks</h4>
+      </div>
+
+      <table className="data lk-compare">
+        <caption className="visually-hidden">Sensory-to-motor connectivity with and without {name}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Measure</th>
+            <th scope="col" className="num">
+              Intact
+            </th>
+            <th scope="col" className="num">
+              Without it
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Flow capacity, in edge-disjoint routes</th>
+            <td className="num">{count(intact)}</td>
+            <td className="num">
+              <span className="lk-after">{count(intact - drop)}</span>
+              <Change value={drop} />
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">Sensory-motor pairs with a path</th>
+            <td className="num">{count(reachable)}</td>
+            <td className="num">
+              <span className="lk-after">{count(reachable - lost)}</span>
+              <Change value={lost} />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p className="caption lk-note">
+        {drop > 0 ? (
+          <>
+            Removing it alone costs {percent(drop / intact, 2)} of flow capacity, rank {count(rank)} of{" "}
+            {count(types.name.length)}
+            {tied > 1 ? `, tied with ${count(tied - 1)} other ${tied === 2 ? "type" : "types"}` : ""}.
+          </>
+        ) : (
+          <>Like {count(tied - 1)} other types, removing it alone leaves all {count(intact)} routes in place.</>
+        )}
+      </p>
+
+      <div className="lk-pairs">
+        <h5 className="lk-pairs-title">Sensory-motor pairs that lose their only path</h5>
+        <PairList
+          name={name}
+          lost={lost}
+          role={types.role[index]}
+          entry={data?.types[name]}
+          limit={data?.limit}
+          state={lost === 0 ? "none" : !listed || error ? "unlisted" : data ? "ready" : "loading"}
+          onFollow={onFollow}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PairList({ name, lost, role, entry, limit, state, onFollow }) {
+  if (state === "none") {
+    return <p className="lk-text">None. Without it, every sensory-motor pair keeps another route.</p>;
+  }
+  if (state === "unlisted") {
+    return <p className="lk-text">{count(lost)} pairs lose their only path; the list of pairs is not in this build.</p>;
+  }
+  if (state === "loading") {
+    return <p className="lk-text lk-quiet">Loading the {count(lost)} pairs.</p>;
+  }
+
+  const other = entry?.other ?? 0;
+  const own = lost - other;
+  const ownText = OWN_PAIRS[role] ?? "as an endpoint";
+  if (other === 0) {
+    return (
+      <p className="lk-text">
+        All {count(lost)} are its own pairs, {ownText}. Every pair between two other types keeps another route.
+      </p>
+    );
+  }
+
+  const hiddenSources = entry.sources_total - entry.sources.length;
+  return (
+    <>
+      <p className="lk-text">
+        {count(other)} {other === 1 ? "pair" : "pairs"} between two other types {other === 1 ? "has" : "have"} no route
+        left without <span className="id">{name}</span>
+        {own > 0 ? `, plus its own ${count(own)} ${own === 1 ? "pair" : "pairs"} ${ownText}` : ""}.
+      </p>
+      <ul className="lk-groups">
+        {entry.sources.map((group) => {
+          const more = group.lost - group.motors.length;
+          return (
+            <li key={group.sensory} className="lk-group">
+              <p className="lk-group-head">
+                <TypeLink name={group.sensory} onFollow={onFollow} />
+                <span>
+                  loses its only path to{" "}
+                  {group.lost === group.reach
+                    ? `all ${count(group.lost)} motor types it reaches`
+                    : `${count(group.lost)} of the ${count(group.reach)} motor types it reaches`}
+                </span>
+              </p>
+              <ul className="lk-motors" aria-label={`Motor types ${group.sensory} can no longer reach`}>
+                {group.motors.map((motor) => (
+                  <li key={motor}>
+                    <TypeLink name={motor} onFollow={onFollow} />
+                  </li>
+                ))}
+                {more > 0 && <li className="lk-more">and {count(more)} more</li>}
+              </ul>
+            </li>
+          );
+        })}
+      </ul>
+      {hiddenSources > 0 && (
+        <p className="lk-text">
+          And {count(hiddenSources)} more sensory {hiddenSources === 1 ? "type" : "types"}.
+        </p>
+      )}
+      <p className="caption">
+        Sensory types with the most lost pairs come first. Motor types are listed descending neurons first, then
+        central brain and nerve cord motor types, each by name{limit ? `, up to ${count(limit)} per sensory type` : ""}.
+        Select a name to look that type up.
+      </p>
+    </>
   );
 }
 

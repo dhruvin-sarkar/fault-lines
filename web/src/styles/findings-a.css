@@ -282,6 +282,55 @@
   font-weight: 650;
 }
 
+.chart .fn-zone {
+  fill: var(--wash);
+}
+
+.chart .fn-grid {
+  stroke: var(--rule);
+  shape-rendering: crispEdges;
+}
+
+.chart .fn-threshold {
+  stroke: var(--ink);
+  stroke-width: 1.25;
+  stroke-dasharray: 4 3;
+}
+
+.chart .fn-halo {
+  paint-order: stroke;
+  stroke: var(--wash);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.chart .fn-threshold-label {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--ink);
+}
+
+.chart .fn-verdict {
+  font-size: 12px;
+  font-weight: 500;
+  fill: var(--ink-3);
+}
+
+.chart .fn-verdict.is-yes {
+  font-weight: 700;
+  fill: var(--ink);
+}
+
+.chart .fn-ring {
+  fill: none;
+  stroke: none;
+}
+
+.fa-focusable:focus-visible .fn-ring {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
 @media (max-width: 1100px) {
   .fa-nulls {
     grid-template-columns: repeat(2, minmax(0, 1fr));

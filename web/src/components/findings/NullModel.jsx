@@ -1,113 +1,298 @@
 import { useMemo, useState } from "react";
 import { Finding, Pending, useResult } from "./Finding.jsx";
 import { inkColor as ink } from "./marks.jsx";
+import { useRovingRows } from "./useRovingRows.js";
 import { ChartFrame, Row, Tooltip } from "../Chart.jsx";
 import { Figure, Segmented, Sidenote, TextBlock } from "../ui.jsx";
-import { useReducedMotion } from "../../lib/hooks.js";
-import { linear, niceTicks } from "../../lib/scales.js";
-import { count, fixed, pValue, sentence, signedFixed } from "../../lib/format.js";
+import { useReducedMotion, useWidth } from "../../lib/hooks.js";
+import { linear, log, niceTicks } from "../../lib/scales.js";
+import { count, fixed, numberWord, sentence, signedFixed } from "../../lib/format.js";
 import "../../styles/findings-a.css";
 
 const ID = "null-model";
-const NEUTRAL_TITLE = "Against randomized graphs with the same degrees";
-const BINS = 18;
+const NEUTRAL_TITLE = "Against degree-preserving randomizations";
 const METRICS = [
   { value: "auc_flow", label: "Flow capacity" },
   { value: "auc_reachability", label: "Reachable pairs" },
 ];
+const P_TICKS = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1];
 
-/** Equal-width bins over a domain that always contains the real value. */
-function histogram(samples, real) {
-  let lo = Math.min(real, ...samples);
-  let hi = Math.max(real, ...samples);
-  const pad = (hi - lo) * 0.06 || 0.005;
-  lo -= pad;
-  hi += pad;
-  const step = (hi - lo) / BINS;
-  const counts = new Array(BINS).fill(0);
-  for (const v of samples) counts[Math.min(BINS - 1, Math.floor((v - lo) / step))] += 1;
-  return { lo, hi, step, counts, peak: Math.max(...counts) };
-}
+/** p to four decimals, the resolution of an empirical p over a few hundred graphs. */
+const p4 = (p) => fixed(p, 4);
 
-
-/** The chapter title states the result only as far as the tests support it. */
-function titleFor(significant, total) {
-  if (significant === total) return "Not the degree sequence";
-  if (significant > 0) return "Partly beyond the degree sequence";
-  return NEUTRAL_TITLE;
-}
-
-function Swatch({ id }) {
-  if (id === "random") {
-    return (
-      <svg width="12" height="12" viewBox="-6 -6 12 12" aria-hidden="true" className="fa-swatch">
-        <path d="M0 -5L5 0L0 5L-5 0Z" className="fa-diamond" style={{ stroke: ink(id) }} />
-      </svg>
-    );
+/**
+ * Short and full wording of one test's reading. Significance is only read when the ensemble is the registered one;
+ * a non-significant result is reported as such, in the registered direction only.
+ */
+function reading(test, complete) {
+  if (!complete) return { short: "Ensemble incomplete", narrow: "Incomplete", yes: false };
+  if (test.verdict === "more_fragile") {
+    return { short: "Significantly more fragile", narrow: "Significant", yes: true };
   }
-  return <span className="swatch" style={{ background: ink(id) }} aria-hidden="true" />;
+  if (test.verdict === "above_null_mean") {
+    return { short: "Not significant, above the randomized mean", narrow: "Not significant", yes: false };
+  }
+  return { short: "Not significant", narrow: "Not significant", yes: false };
+}
+
+/** The chapter title describes the measured outcome and nothing beyond it. */
+function titleFor(yes, total, complete) {
+  if (!complete) return NEUTRAL_TITLE;
+  if (yes === total) return `More fragile than degree-preserving randomizations under all ${numberWord(total)} orders`;
+  if (yes > 0) {
+    return `More fragile than degree-preserving randomizations under ${numberWord(yes)} of ${numberWord(total)} orders`;
+  }
+  return "Not significantly more fragile than degree-preserving randomizations";
 }
 
 const joinNames = (names) =>
   names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 
-function Panel({ strategy, test, samples, significant, metricLabel }) {
-  const [hover, setHover] = useState(null);
-  const hist = useMemo(() => histogram(samples, test.real), [samples, test.real]);
-  const margin = { top: 22, right: 8, bottom: 26, left: 8 };
-  const plot = (h) => h - 6;
+/** "p = a" when every p is the same, "p from a to b" otherwise. */
+function pRange(tests) {
+  const ps = tests.map((t) => t.p_value);
+  const lo = Math.min(...ps);
+  const hi = Math.max(...ps);
+  return lo === hi ? `p = ${p4(lo)}` : `p from ${p4(lo)} to ${p4(hi)}`;
+}
+
+function Marker({ id, x, r = 5.5 }) {
+  if (id === "random") {
+    return <path d={`M${x} ${-r - 1}L${x + r + 1} 0L${x} ${r + 1}L${x - r - 1} 0Z`} className="fa-diamond" style={{ stroke: ink(id) }} />;
+  }
+  return <circle cx={x} r={r} style={{ fill: ink(id) }} />;
+}
+
+function TestRows({ test, n }) {
+  return (
+    <>
+      <Row label="Real AUC" value={fixed(test.real, 4)} />
+      <Row label="Randomized mean" value={`${fixed(test.null_mean, 4)} ± ${fixed(test.null_sd, 4)}`} />
+      <Row label="Randomized range" value={`${fixed(test.null_min, 3)} to ${fixed(test.null_max, 3)}`} />
+      <Row label="At or below real" value={`${count(test.n_at_or_below_real)} of ${count(n)}`} />
+      <Row label="z" value={signedFixed(test.z_score, 1)} />
+      <Row label="p, one-sided" value={p4(test.p_value)} />
+    </>
+  );
+}
+
+/** One row per removal order: its one-sided p on a log axis, the corrected threshold, and the reading. */
+function Ladder({ strategies, tests, n, alpha, floor, complete, metricLabel }) {
+  const [wrapRef, width] = useWidth();
+  const [active, setActive] = useState(null);
+  const wide = width >= 720;
+  const rowH = wide ? 42 : 60;
+  const margin = { top: 40, right: wide ? 280 : 14, bottom: 46, left: wide ? 200 : 6 };
+  const keys = strategies.map((s) => s.id);
+  const rowProps = useRovingRows(keys, setActive);
+  const height = margin.top + margin.bottom + rowH * strategies.length;
+  const ps = strategies.map((s) => tests[s.id].p_value);
+  const domain = [Math.min(floor, alpha, ...ps) / 1.6, 1];
+  const center = (i) => (wide ? i * rowH + rowH / 2 : i * rowH + rowH - 16);
+  const activeIndex = keys.indexOf(active);
 
   return (
-    <div className="fa-null">
-      <div className="fa-null-head">
-        <span>
-          <Swatch id={strategy.id} />
-          {strategy.label}
-        </span>
-        <span className={`fa-verdict${significant ? " is-yes" : ""}`}>{significant ? "Significant" : "Not significant"}</span>
-      </div>
+    <div ref={wrapRef}>
       <ChartFrame
-        height={150}
+        height={height}
         margin={margin}
-        label={`${metricLabel} AUC of ${samples.length} randomized graphs under ${strategy.label} removal; the real graph scores ${fixed(test.real, 3)}.`}
-        onPointer={(x, _y, inner) => {
-          const bin = Math.floor((x / inner.width) * BINS);
-          setHover(bin >= 0 && bin < BINS ? bin : null);
+        role="group"
+        label={`One-sided p-value of the ${metricLabel.toLowerCase()} test for each of ${strategies.length} removal orders against the corrected threshold of ${p4(alpha)}, on a logarithmic axis. Use the arrow keys to move between orders.`}
+        onPointer={(_x, y) => {
+          const i = Math.floor(y / rowH);
+          setActive(i >= 0 && i < keys.length ? keys[i] : null);
         }}
-        onLeave={() => setHover(null)}
-        overlay={({ margin: m, width: w, height: h }) => {
-          if (hover == null) return null;
-          const from = hist.lo + hover * hist.step;
-          const barTop = h - (hist.counts[hover] / (hist.peak || 1)) * plot(h);
+        onLeave={() => setActive(null)}
+        overlay={({ margin: m, width: w }) => {
+          if (activeIndex < 0) return null;
+          const s = strategies[activeIndex];
+          const test = tests[s.id];
+          const scale = log(domain, [0, w - m.left - m.right]);
           return (
-            <Tooltip x={m.left + ((hover + 0.5) / BINS) * (w - m.left - m.right)} y={m.top + barTop - 2} width={w}>
-              <strong>
-                AUC {fixed(from, 3)} to {fixed(from + hist.step, 3)}
-              </strong>
-              <Row label="Randomized graphs" value={count(hist.counts[hover])} />
-              <Row label="Real graph" value={fixed(test.real, 3)} />
+            <Tooltip x={m.left + scale(test.p_value)} y={m.top + center(activeIndex) - 12} width={w}>
+              <div className="fa-tip">
+                <strong>{sentence(s.label)}</strong>
+                <span className="fa-tip-sub">{reading(test, complete).short}</span>
+                <TestRows test={test} n={n} />
+              </div>
             </Tooltip>
           );
         }}
       >
         {(inner) => {
-          const x = linear([hist.lo, hist.hi], [0, inner.width]);
-          const bw = inner.width / BINS;
-          const ticks = niceTicks([hist.lo, hist.hi], inner.width < 240 ? 2 : 3).filter((t) => t >= hist.lo && t <= hist.hi);
-          const realX = x(test.real);
-          const flip = realX > inner.width - 70;
+          const x = log(domain, [0, inner.width]);
+          const ticks = P_TICKS.filter((t) => t >= domain[0] && t <= 1).filter(
+            (t) => wide || [0.001, 0.01, 0.1, 1].includes(t) || t === 0.005,
+          );
+          const ax = x(alpha);
           return (
             <g>
-              {hist.counts.map((c, i) => (
+              <rect className="fn-zone" x={0} y={-8} width={ax} height={inner.height + 8} />
+              {ticks.map((t) => (
+                <line key={t} className="fn-grid" x1={x(t)} x2={x(t)} y1={-8} y2={inner.height} />
+              ))}
+              <line className="fn-threshold" x1={ax} x2={ax} y1={-24} y2={inner.height} />
+              <text className="fn-threshold-label" x={ax + 6} y={-14}>
+                Threshold 0.05 / {strategies.length} = {p4(alpha)}
+              </text>
+              <g transform={`translate(0,${inner.height})`}>
+                <line className="axis-line" x2={inner.width} />
+                {ticks.map((t) => (
+                  <g key={t} transform={`translate(${x(t)},0)`}>
+                    <line className="fa-axis-tick" y2={5} />
+                    <text y={18} textAnchor="middle">
+                      {String(t)}
+                    </text>
+                  </g>
+                ))}
+                <text className="axis-title" x={inner.width} y={38} textAnchor="end">
+                  One-sided p, logarithmic
+                </text>
+              </g>
+              {strategies.map((s, i) => {
+                const test = tests[s.id];
+                const r = reading(test, complete);
+                const cy = center(i);
+                const px = x(test.p_value);
+                const flip = px > inner.width - 90;
+                const labelY = wide ? cy : i * rowH + 18;
+                return (
+                  <g
+                    key={s.id}
+                    {...rowProps(s.id)}
+                    role="img"
+                    aria-label={`${sentence(s.label)}: p = ${p4(test.p_value)}, ${r.short.toLowerCase()}. Real AUC ${fixed(test.real, 3)}, randomized mean ${fixed(test.null_mean, 3)}, ${count(test.n_at_or_below_real)} of ${count(n)} randomized graphs at or below the real score.`}
+                  >
+                    <rect
+                      className={`fa-band${active === s.id ? " is-on" : ""}`}
+                      x={-margin.left + 2}
+                      y={i * rowH + 1}
+                      width={inner.width + margin.left + margin.right - 4}
+                      height={rowH - 2}
+                      rx={3}
+                    />
+                    <line className="fa-track" x1={0} x2={inner.width} y1={cy} y2={cy} />
+                    <g transform={`translate(0,${cy})`}>
+                      <Marker id={s.id} x={px} />
+                      <text className="fa-value fn-halo" x={flip ? px - 11 : px + 11} y={4} textAnchor={flip ? "end" : "start"}>
+                        {p4(test.p_value)}
+                      </text>
+                    </g>
+                    <text className="fa-row-label" x={wide ? -margin.left + 12 : 0} y={labelY} dy={wide ? "0.32em" : 0}>
+                      {sentence(s.label)}
+                    </text>
+                    <text
+                      className={`fn-verdict${r.yes ? " is-yes" : ""}`}
+                      x={wide ? inner.width + 18 : inner.width}
+                      y={labelY}
+                      dy={wide ? "0.32em" : 0}
+                      textAnchor={wide ? "start" : "end"}
+                    >
+                      {wide ? r.short : r.narrow}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          );
+        }}
+      </ChartFrame>
+    </div>
+  );
+}
+
+const STEPS = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1 };
+
+/** One removal order: randomized-graph scores as a histogram with the real score as a line. */
+function Panel({ strategy, test, n, complete, metricLabel }) {
+  const [hover, setHover] = useState(null);
+  const { lo, step, counts, quantiles } = test.distribution;
+  const bins = counts.length;
+  const peak = Math.max(1, ...counts);
+  const hi = lo + bins * step;
+  const domain = useMemo(() => {
+    const a = Math.min(lo, test.real);
+    const b = Math.max(hi, test.real);
+    const pad = (b - a) * 0.06 || 0.005;
+    return [a - pad, b + pad];
+  }, [lo, hi, test.real]);
+  const margin = { top: 24, right: 10, bottom: 28, left: 10 };
+  const r = reading(test, complete);
+  const median = Math.min(bins - 1, Math.max(0, Math.floor((quantiles[2] - lo) / step)));
+
+  const onKeyDown = (event) => {
+    let next = null;
+    if (event.key in STEPS) next = Math.max(0, Math.min(bins - 1, (hover ?? median) + STEPS[event.key]));
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = bins - 1;
+    if (next == null) return;
+    event.preventDefault();
+    setHover(next);
+  };
+
+  return (
+    <div className="fa-null">
+      <div className="fa-null-head">
+        <span>
+          <svg width="12" height="12" viewBox="-6 -6 12 12" aria-hidden="true" className="fa-swatch">
+            <Marker id={strategy.id} x={0} r={4.5} />
+          </svg>
+          {sentence(strategy.label)}
+        </span>
+        <span className={`fa-verdict${r.yes ? " is-yes" : ""}`}>{r.narrow}</span>
+      </div>
+      <ChartFrame
+        height={156}
+        margin={margin}
+        role="group"
+        label={`${metricLabel} AUC of ${count(n)} randomized graphs under ${strategy.label} removal, with the real graph at ${fixed(test.real, 3)}. Focus the histogram and use the arrow keys to read each bar.`}
+        onPointer={(px, _y, inner) => {
+          const value = linear(domain, [0, inner.width]).invert(px);
+          const bin = Math.floor((value - lo) / step);
+          setHover(bin >= 0 && bin < bins ? bin : null);
+        }}
+        onLeave={() => setHover(null)}
+        overlay={({ margin: m, width: w, height: h }) => {
+          if (hover == null) return null;
+          const x = linear(domain, [0, w - m.left - m.right]);
+          const from = lo + hover * step;
+          return (
+            <Tooltip x={m.left + x(from + step / 2)} y={m.top + h - (counts[hover] / peak) * (h - 6) - 4} width={w}>
+              <strong>
+                AUC {fixed(from, 4)} to {fixed(from + step, 4)}
+              </strong>
+              <Row label="Randomized graphs" value={count(counts[hover])} />
+              <Row label="Real graph" value={fixed(test.real, 4)} />
+            </Tooltip>
+          );
+        }}
+      >
+        {(inner) => {
+          const x = linear(domain, [0, inner.width]);
+          const bw = x(lo + step) - x(lo);
+          const ticks = niceTicks(domain, inner.width < 240 ? 2 : 3).filter((t) => t >= domain[0] && t <= domain[1]);
+          const digits = Math.max(2, Math.min(4, Math.ceil(-Math.log10((domain[1] - domain[0]) / 3))));
+          const realX = x(test.real);
+          const flip = realX > inner.width - 80;
+          return (
+            <g
+              tabIndex={0}
+              className="fa-focusable"
+              onKeyDown={onKeyDown}
+              onFocus={() => setHover((h) => h ?? median)}
+              onBlur={() => setHover(null)}
+            >
+              <rect className="fn-ring" x={-6} y={-18} width={inner.width + 12} height={inner.height + 22} rx={4} />
+              {counts.map((c, i) => (
                 <rect
                   key={i}
                   className="fa-move"
                   width={Math.max(1, bw - 1)}
                   height={1}
                   style={{
-                    transform: `translate(${i * bw + 0.5}px, ${inner.height}px) scaleY(${-(c / (hist.peak || 1)) * plot(inner.height)})`,
+                    transform: `translate(${x(lo + i * step) + 0.5}px, ${inner.height}px) scaleY(${-(c / peak) * (inner.height - 6)})`,
                     fill: ink(strategy.id),
-                    fillOpacity: strategy.id === "random" ? 0.18 : hover == null || hover === i ? 0.9 : 0.25,
+                    fillOpacity: strategy.id === "random" ? 0.2 : hover == null || hover === i ? 0.85 : 0.3,
                     stroke: ink(strategy.id),
                     strokeWidth: strategy.id === "random" || (hover != null && hover !== i) ? 1 : 0,
                     vectorEffect: "non-scaling-stroke",
@@ -119,8 +304,8 @@ function Panel({ strategy, test, samples, significant, metricLabel }) {
                 {ticks.map((t) => (
                   <g key={t} transform={`translate(${x(t)},0)`}>
                     <line className="fa-axis-tick" y2={4} />
-                    <text y={16} textAnchor="middle">
-                      {fixed(t, 2)}
+                    <text y={17} textAnchor="middle">
+                      {fixed(t, digits)}
                     </text>
                   </g>
                 ))}
@@ -137,25 +322,69 @@ function Panel({ strategy, test, samples, significant, metricLabel }) {
       </ChartFrame>
       <dl className="fa-null-stats">
         <div>
-          <dt>Randomized</dt>
+          <dt>Middle 95%</dt>
           <dd>
-            {fixed(test.null_mean, 3)} ± {fixed(test.null_sd, 3)}
+            {fixed(quantiles[0], 3)} to {fixed(quantiles[4], 3)}
           </dd>
         </div>
         <div>
           <dt>At or below real</dt>
           <dd>
-            {count(test.n_at_or_below_real)} of {count(samples.length)}
+            {count(test.n_at_or_below_real)} of {count(n)}
           </dd>
         </div>
         <div>
           <dt>z; p</dt>
           <dd>
-            {signedFixed(test.z_score, 1)}; {pValue(test.p_value)}
+            {signedFixed(test.z_score, 1)}; {p4(test.p_value)}
           </dd>
         </div>
       </dl>
     </div>
+  );
+}
+
+function ResultText({ strategies, data, complete }) {
+  const n = data.n_nulls;
+  const total = strategies.length;
+  const flow = (s) => data.strategies[s.id].auc_flow;
+  if (!complete) {
+    return (
+      <p>
+        This build reports {count(n)} of the {count(data.n_preregistered)} randomized graphs fixed in advance. The
+        registered test needs all of them, so no removal order is read as significant or not significant here; the
+        p-values below describe the partial ensemble only.
+      </p>
+    );
+  }
+  const yes = strategies.filter((s) => flow(s).verdict === "more_fragile");
+  const no = strategies.filter((s) => flow(s).verdict !== "more_fragile");
+  const above = no.filter((s) => flow(s).verdict === "above_null_mean");
+  const reachYes = strategies.filter((s) => data.strategies[s.id].auc_reachability.verdict === "more_fragile");
+  const atFloor = strategies.filter((s) => flow(s).n_at_or_below_real === 0);
+  const names = (list) => joinNames(list.map((s) => (s.id === "random" ? "random removal" : s.label)));
+
+  let main;
+  if (yes.length === total) {
+    main = `Under all ${numberWord(total)} removal orders the real graph scores significantly below its randomizations (${pRange(yes.map(flow))}, each below the Bonferroni threshold of ${p4(data.alpha)}).`;
+  } else if (yes.length > 0) {
+    main = `Under ${numberWord(yes.length)} of the ${numberWord(total)} removal orders, ${names(yes)}, the real graph scores significantly below its randomizations (${pRange(yes.map(flow))}, below the Bonferroni threshold of ${p4(data.alpha)}). Under ${names(no)} it does not differ significantly in the registered direction (${pRange(no.map(flow))}).`;
+  } else {
+    main = `Under none of the ${numberWord(total)} removal orders does the real graph score significantly below its randomizations (${pRange(no.map(flow))}, against a Bonferroni threshold of ${p4(data.alpha)}).`;
+  }
+  const aboveText = above.length
+    ? ` Under ${names(above)} the real score lies above the randomized mean.`
+    : "";
+  const floorText = atFloor.length
+    ? ` A p of ${p4(data.p_floor)} is the smallest attainable with ${count(n)} graphs: no randomized graph scored at or below the real one${atFloor.length === total ? " under any order" : ` under ${names(atFloor)}`}.`
+    : "";
+  return (
+    <p>
+      {main}
+      {aboveText}
+      {floorText} Reachable pairs, the secondary measure, give {numberWord(reachYes.length)} of {numberWord(total)}{" "}
+      significant results.
+    </p>
   );
 }
 
@@ -175,81 +404,95 @@ export default function NullModel({ meta }) {
   if (!data) return null;
 
   const strategies = meta.strategies.filter((s) => data.strategies[s.id]);
+  const n = data.n_nulls;
+  const complete = n === data.n_preregistered;
   const alpha = data.alpha;
-  const isSignificant = (t) => t.significant ?? t.p_value <= alpha;
-  const significantFor = (m) => strategies.filter((s) => isSignificant(data.strategies[s.id][m]));
-  const flowYes = significantFor("auc_flow");
-  const flowNo = strategies.filter((s) => !flowYes.includes(s));
-  const reachYes = significantFor("auc_reachability");
-  const aboveMean = flowNo.filter((s) => data.strategies[s.id].auc_flow.real > data.strategies[s.id].auc_flow.null_mean);
+  const yes = strategies.filter((s) => data.strategies[s.id].auc_flow.verdict === "more_fragile");
   const metricLabel = METRICS.find((m) => m.value === metric).label;
-  const floor = 1 / (data.n_nulls + 1);
-  const all = flowYes.length === strategies.length;
+  const tests = Object.fromEntries(strategies.map((s) => [s.id, data.strategies[s.id][metric]]));
+  const control = <Segmented label="Score" options={METRICS} value={metric} onChange={setMetric} />;
 
   return (
     <Finding
       id={ID}
-      title={titleFor(flowYes.length, strategies.length)}
-      stat={`${flowYes.length} of ${strategies.length}`}
-      statLabel="removal orders under which routing fails significantly sooner than in randomized graphs"
+      title={titleFor(yes.length, strategies.length, complete)}
+      stat={complete ? `${yes.length} of ${strategies.length}` : `${count(n)} of ${count(data.n_preregistered)}`}
+      statLabel={
+        complete
+          ? `removal orders under which routing collapses significantly sooner than in ${count(n)} degree-preserving randomizations`
+          : "randomized graphs scored; the registered test needs all of them"
+      }
     >
       <TextBlock
         notes={
           <>
             <Sidenote title="Degree-preserving randomization">
-              Each of the {count(data.n_nulls)} randomized graphs keeps every cell type&apos;s number of inputs and
-              outputs and its output synapse total, but reassigns who connects to whom.
+              Each randomized graph keeps every cell type&apos;s number of inputs and outputs and its output synapse
+              total, but reassigns who connects to whom.
             </Sidenote>
             <Sidenote title="Fixed in advance">
-              The direction, the one-sided test and the Bonferroni threshold of {fixed(alpha, 4)} were registered before
-              any randomized graph was scored. With {count(data.n_nulls)} graphs the smallest possible p is{" "}
-              {fixed(floor, 4)}.
+              The direction, the one-sided test, {count(data.n_preregistered)} randomized graphs and the Bonferroni
+              threshold of {p4(alpha)} were registered before any randomized graph was scored. With {count(n)} graphs the
+              smallest attainable p is {p4(data.p_floor)}.
             </Sidenote>
           </>
         }
       >
         <p>
-          A few very connected types make almost any network fragile under targeted removal. The question here is
-          whether the fly&apos;s particular wiring adds fragility beyond its degree sequence, so every removal order was
-          rerun on randomized graphs with the same degrees.
+          Degree-preserving randomizations keep how many partners every cell type has and scramble who connects to
+          whom. If the real graph is no more fragile than they are, its fragility follows from the
+          degree sequence alone. Every removal order was rerun on each randomized graph, and each was tested in the
+          direction registered in advance: does the real graph score lower?
         </p>
         <p>
           The score is the area under the flow capacity curve over the first half of removals; lower means routing
-          collapses sooner. {all ? "Under all" : `Under ${flowYes.length} of`} {strategies.length} removal orders
-          {!all && flowYes.length > 0 ? ` (${joinNames(flowYes.map((s) => s.label))})` : ""} the real graph scores
-          significantly below its randomized versions.
-          {flowNo.length > 0 &&
-            ` Under the other ${flowNo.length === 1 ? "one" : flowNo.length}, the difference does not reach the corrected threshold${
-              aboveMean.length ? `, and under ${aboveMean.length === flowNo.length ? (flowNo.length === 1 ? "it" : "all of them") : `${aboveMean.length} of them`} the real graph scores above the randomized mean` : ""
-            }.`}{" "}
-          Reachable pairs, the secondary measure, give {reachYes.length} of {strategies.length} significant results.
+          collapses sooner.
         </p>
+        <ResultText strategies={strategies} data={data} complete={complete} />
       </TextBlock>
 
       <Figure
-        className={reduced ? "fa-still" : ""}
-        title="The real graph against its degree-preserving randomizations"
-        controls={<Segmented label="Score" options={METRICS} value={metric} onChange={setMetric} />}
+        title="Each removal order against the corrected threshold"
+        controls={control}
         caption={
           <>
-            Each panel is one removal order. Bars count the {count(data.n_nulls)} randomized graphs by their{" "}
+            Each row is one removal order and its one-sided p-value for the {metricLabel.toLowerCase()} score, on a
+            logarithmic axis. p is (1 + randomized graphs scoring at or below the real graph) / ({count(n)} + 1), so it
+            cannot fall below {p4(data.p_floor)}. The shaded band lies below the threshold of 0.05 / {strategies.length}{" "}
+            = {p4(alpha)}, fixed in advance for {numberWord(strategies.length)} tests; a mark inside it is a significant
+            result. Random removal is the diamond. Hover a row, or focus the chart and use the arrow keys, for its
+            scores.
+          </>
+        }
+      >
+        <Ladder
+          strategies={strategies}
+          tests={tests}
+          n={n}
+          alpha={alpha}
+          floor={data.p_floor}
+          complete={complete}
+          metricLabel={metricLabel}
+        />
+      </Figure>
+
+      <Figure
+        className={reduced ? "fa-still" : ""}
+        title="The real graph against its randomizations"
+        controls={control}
+        caption={
+          <>
+            Each panel is one removal order. Bars count the {count(n)} randomized graphs by their{" "}
             {metricLabel.toLowerCase()} AUC; the black line is the real graph. A line left of the bars means the real
-            wiring loses routing faster than wiring with the same degrees. p is (1 + randomized graphs at or below the
-            real score) / ({count(data.n_nulls)} + 1), judged against {fixed(alpha, 4)}; z is the distance from the
-            randomized mean in standard deviations. Random removal is drawn with outlined bars and a diamond. Panels use their own axes. Hover a bar for its count.
+            wiring loses routing faster than wiring with the same degrees. The middle 95% spans the 2.5th to the 97.5th
+            percentile of the randomized scores, and z is the distance of the real score from their mean in standard
+            deviations. Panels use their own axes. Hover a bar, or focus a panel and use the arrow keys, for its count.
           </>
         }
       >
         <div className="fa-nulls">
           {strategies.map((s) => (
-            <Panel
-              key={s.id}
-              strategy={s}
-              test={data.strategies[s.id][metric]}
-              samples={data.samples[s.id][metric]}
-              significant={isSignificant(data.strategies[s.id][metric])}
-              metricLabel={metricLabel}
-            />
+            <Panel key={s.id} strategy={s} test={tests[s.id]} n={n} complete={complete} metricLabel={metricLabel} />
           ))}
         </div>
       </Figure>
@@ -282,14 +525,16 @@ export default function NullModel({ meta }) {
                       <td>{m.label}</td>
                       <td className="num">{fixed(t.real, 3)}</td>
                       <td className="num">{fixed(t.null_mean, 3)}</td>
-                      <td className="num">{fixed(t.null_sd, 3)}</td>
+                      <td className="num">{fixed(t.null_sd, 4)}</td>
                       <td className="num">
                         {fixed(t.null_min, 3)} to {fixed(t.null_max, 3)}
                       </td>
-                      <td className="num">{count(t.n_at_or_below_real)}</td>
-                      <td className="num">{signedFixed(t.z_score, 2)}</td>
-                      <td className="num">{pValue(t.p_value)}</td>
-                      <td>{isSignificant(t) ? "Significant" : "Not significant"}</td>
+                      <td className="num">
+                        {count(t.n_at_or_below_real)} of {count(n)}
+                      </td>
+                      <td className="num">{signedFixed(t.z_score, 1)}</td>
+                      <td className="num">{p4(t.p_value)}</td>
+                      <td>{reading(t, complete).short}</td>
                     </tr>
                   );
                 }),

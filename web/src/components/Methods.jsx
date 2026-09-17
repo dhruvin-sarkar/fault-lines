@@ -103,6 +103,7 @@ function nullEnsemble(result, strategies) {
     alpha: result.data.alpha ?? 0.05 / strategies,
     tests,
     significant: tests.filter((t) => t.significant).length,
+    above: tests.filter((t) => !t.significant && t.real > t.null_mean).length,
   };
 }
 
@@ -117,27 +118,35 @@ function NullStatus({ ensemble, alpha }) {
       </p>
     );
   }
-  const { n, tests, significant } = ensemble;
+  const { n, tests, significant, above } = ensemble;
   const floor = 1 / (n + 1);
-  return (
-    <>
-      {n !== PREREGISTERED_NULLS && (
-        <p>
-          <strong>Deviation from the plan.</strong> The pre-registration fixed {PREREGISTERED_NULLS} randomized graphs.
-          The results reported here use {count(n)}, because the full ensemble had not finished when the data were
-          exported. Nothing else was changed: the direction of each test, the threshold and the protocol are as
-          registered. With {count(n)} graphs the smallest attainable p is 1 / {count(n + 1)} = {fixed(floor, 4)}
-          {floor >= alpha
-            ? ", above the corrected threshold, so no strategy can reach significance at this ensemble size."
-            : ", below the corrected threshold, so a significant result remains attainable."}
-        </p>
-      )}
+  if (n !== PREREGISTERED_NULLS) {
+    return (
       <p>
-        <strong>Result.</strong> Against {count(n)} randomized graphs, {significant} of {tests.length} strategies have a
-        flow-capacity AUC significantly below that of their randomizations at the corrected threshold. The per-strategy
-        distributions are shown with the findings.
+        <strong>Deviation from the plan.</strong> The pre-registration fixed {PREREGISTERED_NULLS} randomized graphs;
+        this build reports {count(n)}. The registered test needs the full ensemble, so no strategy is read as significant
+        or not significant here. With {count(n)} graphs the smallest attainable p is 1 / {count(n + 1)} ={" "}
+        {fixed(floor, 4)}
+        {floor >= alpha
+          ? ", above the corrected threshold, so no strategy could reach significance at this ensemble size."
+          : ", below the corrected threshold."}
       </p>
-    </>
+    );
+  }
+  return (
+    <p>
+      <strong>Result.</strong> Against {count(n)} randomized graphs,{" "}
+      {significant === 0 ? `none of the ${tests.length} strategies has` : `${significant} of ${tests.length} strategies have`}{" "}
+      a flow-capacity AUC significantly below that of their randomizations at the corrected threshold of{" "}
+      {fixed(alpha, 4)}
+      {significant > 0 && significant < tests.length
+        ? `; for the other ${tests.length - significant}, the real graph does not differ significantly in the registered direction`
+        : ""}
+      {above ? `${significant > 0 && significant < tests.length ? ", and for" : "; for"} ${above} of them its AUC lies above the randomized mean` : ""}
+      . Nothing in the test was changed after the randomized scores were seen. The per-strategy distributions and
+      p-values are in{" "}
+      <a href="#null-model">the null-model finding</a>.
+    </p>
   );
 }
 
@@ -577,10 +586,17 @@ export default function Methods({ meta }) {
                   <strong>{cascade.head}</strong> {cascade.text}
                 </li>
               )}
-              {(ensemble.state !== "ready" || ensemble.n !== PREREGISTERED_NULLS) && (
+              {ensemble.state !== "ready" || ensemble.n !== PREREGISTERED_NULLS ? (
                 <li>
                   <strong>An incomplete null ensemble.</strong> Until all {PREREGISTERED_NULLS} randomized graphs are
                   scored, the comparison with degree-preserving randomizations is not the registered test.
+                </li>
+              ) : (
+                <li>
+                  <strong>What the null model holds fixed.</strong> The randomized graphs keep every type&apos;s in-degree,
+                  out-degree and output synapse total, but not its input synapse total or any structure beyond degrees.
+                  A significant difference says the fragility is not explained by the degree sequence alone, not which
+                  feature of the wiring explains it; a non-significant one does not show that the wiring adds nothing.
                 </li>
               )}
             </ul>

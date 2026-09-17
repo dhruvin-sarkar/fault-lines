@@ -88,3 +88,22 @@ def test_copy_figures_with_nothing_on_disk_copies_nothing(monkeypatch, tmp_path)
     _, web_data, _ = isolate(monkeypatch, tmp_path)
     assert static_export.copy_figures() == []
     assert (web_data.parent / "figures").is_dir()
+
+
+def test_pair_loss_cuts_long_lists_and_keeps_the_full_counts(monkeypatch, tmp_path):
+    results, _, _ = isolate(monkeypatch, tmp_path)
+    limit = static_export.PAIR_LIMIT
+    motors = [f"DN{i:03d}" for i in range(limit + 5)]
+    groups = [{"sensory": f"S{i:02d}", "reach": len(motors), "motors": motors} for i in range(limit + 2)]
+    report = {"types_with_pairs_lost": 7, "types": {"hub": groups, "bridge": [groups[0] | {"motors": motors[:2]}]}}
+    (results / "pair_loss.json").write_text(json.dumps(report), encoding="utf-8")
+    pd.DataFrame({"cell_type": ["hub", "bridge"], "own_pairs": [0, 3],
+                  "other_pairs": [len(groups) * len(motors), 2]}).to_csv(results / "pair_loss.csv", index=False)
+    exported = static_export.pair_loss()
+    assert exported["limit"] == limit and exported["types_with_pairs_lost"] == 7
+    hub = exported["types"]["hub"]
+    assert hub["other"] == len(groups) * len(motors) and hub["own"] == 0 and hub["sources_total"] == len(groups)
+    assert [s["sensory"] for s in hub["sources"]] == [g["sensory"] for g in groups[:limit]]
+    assert all(s["lost"] == len(motors) and s["motors"] == motors[:limit] for s in hub["sources"])
+    assert exported["types"]["bridge"] == {"own": 3, "other": 2, "sources_total": 1, "sources": [
+        {"sensory": "S00", "reach": len(motors), "lost": 2, "motors": motors[:2]}]}

@@ -74,6 +74,7 @@ function useKeyResults({ meta, percolation }) {
   const avalanches = useResult("avalanches.json").data;
   const pairs = useResult("pairs.json").data;
   const bottleneck = useResult("bottleneck.json").data;
+  const nulls = useResult("nulls.json").data;
 
   const labels = Object.fromEntries(meta.strategies.map((s) => [s.id, s.label]));
   const ids = meta.strategies.map((s) => s.id);
@@ -92,6 +93,18 @@ function useKeyResults({ meta, percolation }) {
       ? `Random removal needs ${percent(random.critical_fraction)} (95% CI ${percent(random.critical_fraction_ci95[0])} to ${percent(random.critical_fraction_ci95[1])}).`
       : `Random removal needs ${percent(random.critical_fraction)}.`,
   });
+
+  // A significance count is a key result only for the ensemble size fixed in advance.
+  if (nulls?.strategies && nulls.n_nulls === nulls.n_preregistered) {
+    const tests = ids.filter((id) => nulls.strategies[id]).map((id) => nulls.strategies[id].auc_flow);
+    const yes = tests.filter((t) => t.verdict === "more_fragile").length;
+    rows.push({
+      id: "null-model",
+      value: `${yes} of ${tests.length}`,
+      title: `removal orders under which the real graph is significantly more fragile than ${count(nulls.n_nulls)} degree-preserving randomizations`,
+      note: `One-sided tests at a Bonferroni threshold of ${nulls.alpha.toFixed(4)}; the smallest attainable p is ${nulls.p_floor.toFixed(4)}.`,
+    });
+  }
 
   let region = null;
   if (regions?.length) {
@@ -148,10 +161,10 @@ function useKeyResults({ meta, percolation }) {
     let note = null;
     if (sensitivity && primary.power_law_plausible !== sensitivity.power_law_plausible) {
       const [kept, rejected] = primary.power_law_plausible ? [primary, sensitivity] : [sensitivity, primary];
-      note = `A power law fits cascade sizes in one pooling of runs (${pClause(kept.bootstrap_p)}) and is rejected in the other (${pClause(rejected.bootstrap_p)}).`;
+      note = `A power law is not rejected for cascade sizes in one pooling of runs (${pClause(kept.bootstrap_p)}) and is rejected in the other (${pClause(rejected.bootstrap_p)}).`;
     } else if (sensitivity) {
       note = primary.power_law_plausible
-        ? "A power law fits cascade sizes in both poolings of runs."
+        ? "A power law is not rejected for cascade sizes in either pooling of runs."
         : "A power law is rejected for cascade sizes in both poolings of runs.";
     }
     rows.push({
@@ -205,7 +218,8 @@ function Lede({ opening, region, superclass, labels }) {
     <p className="lede fi-lede">
       Removing <strong>{percent(opening.fc)}</strong> of cell types, the ones{" "}
       {byOutStrength ? "that send the most synapses" : `ranked highest by ${labels[opening.first]}`}, halves the
-      connectome&apos;s capacity to carry signals from sensory neurons to motor output. Removed at random, it takes{" "}
+      connectome&apos;s capacity to route from sensory to descending and motor cell types. Removed at random, it
+      takes{" "}
       <strong>{percent(opening.random)}</strong>.
       {region && superclass && (
         <>
@@ -229,7 +243,7 @@ export default function Findings(props) {
       <div className="wrap">
         <header>
           <h2 id="findings-title" className="chapter-title fi-title">
-            A few cell types carry the routing
+            Losing a few percent of cell types halves the routing
           </h2>
           <div className="text-grid">
             <Lede {...lede} />

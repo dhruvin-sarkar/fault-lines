@@ -3,8 +3,8 @@ WORKERS ?= 4
 NULLS ?= 200
 export PYTHONUTF8 = 1
 CHECKS := schema sensory_motor_sets type_graph percolation critical_thresholds avalanches regional_impact structure_profile \
-	edge_attack hidden_bottleneck synthetic_lethal_pairs literature_validation brain_vnc bilateral null_model type_atlas \
-	export references
+	edge_attack hidden_bottleneck synthetic_lethal_pairs pair_loss literature_validation brain_vnc bilateral null_model \
+	type_atlas export references
 
 .PHONY: reproduce data analyze validate context hero export web paper poster test verify readme captures clean
 
@@ -20,6 +20,7 @@ analyze:
 	$(PYTHON) -m pipeline.critical_thresholds
 	$(PYTHON) -m pipeline.run_percolation --from-results
 	$(PYTHON) -m pipeline.single_removal --workers $(WORKERS)
+	$(PYTHON) -m pipeline.pair_loss
 	$(PYTHON) -m pipeline.avalanche_analysis
 	$(PYTHON) -m pipeline.brain_vnc_comparison --workers $(WORKERS)
 	$(PYTHON) -m pipeline.synthetic_lethal_pairs --workers $(WORKERS)
