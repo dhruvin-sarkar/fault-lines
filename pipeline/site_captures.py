@@ -468,13 +468,13 @@ def record_lookup(tab: Tab, folder: Path, site: str, name: str = "ALIN7") -> Non
 PHONE_SCREENS = (
     ("hero", "#", None, 0),
     ("findings", "#findings", "#findings-title", 76),
-    ("chart", "#thresholds", "#thresholds .figure", 72),
-    ("lookup", "#lookup/ALIN7", "#lookup-title", 80),
+    ("nulls", "#null-model", "#null-model .figure:last-of-type", 72),
+    ("lookup", "#lookup/ALIN7", "#lookup .fc-profile", 55),
 )
 
 
 def record_phones(tab: Tab, folder: Path, site: str) -> None:
-    """Four screens at phone width: the opening, the key results, a findings chart and a cell type profile."""
+    """Four screens at phone width: the opening, the key results, the null-model histograms and a cell type profile."""
     tab.resize(*PHONE, mobile=True)
     tab.open(site, "document.getElementById('findings')")
     shots = []
@@ -482,6 +482,8 @@ def record_phones(tab: Tab, folder: Path, site: str) -> None:
         tab.evaluate(f"(() => {{ location.hash = {json.dumps(anchor)}; return true; }})()")
         time.sleep(1.2)
         if selector:
+            # Charts and maps settle after the jump, which moves the target, so the offset is taken again.
+            tab.scroll_to(selector, offset)
             tab.scroll_to(selector, offset)
         else:
             tab.evaluate("window.scrollTo({top: 0, behavior: 'instant'}) || true")
