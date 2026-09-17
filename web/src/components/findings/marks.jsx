@@ -3,6 +3,7 @@ import { sentence } from "../../lib/format.js";
 import { logTicks } from "../../lib/scales.js";
 
 const CHAR = 6.7;
+const LINE = 13;
 
 /** Distributions a power-law fit is tested against, named with their article for running text. */
 export const ALTERNATIVES = {
@@ -94,15 +95,21 @@ function lines(label, narrow) {
   return [label.slice(0, cut), label.slice(cut + 1)];
 }
 
-/** Label positions at least `gap` apart inside [lo, hi], moving each as little as the others allow. */
+/**
+ * Label positions at least `gap` apart inside [lo, hi], moving each as little as the others allow. `gap` is a number
+ * or a function of two neighbouring items, for labels of different heights.
+ */
 export function spread(items, gap, lo, hi) {
+  const between = typeof gap === "function" ? gap : () => gap;
   const sorted = [...items].sort((a, b) => a.y - b.y);
   sorted.forEach((item) => (item.y = Math.max(lo, Math.min(hi, item.y))));
-  for (let i = 1; i < sorted.length; i += 1) sorted[i].y = Math.max(sorted[i].y, sorted[i - 1].y + gap);
+  for (let i = 1; i < sorted.length; i += 1) {
+    sorted[i].y = Math.max(sorted[i].y, sorted[i - 1].y + between(sorted[i - 1], sorted[i]));
+  }
   const n = sorted.length;
   if (n && sorted[n - 1].y > hi) {
     sorted[n - 1].y = hi;
-    for (let i = n - 2; i >= 0; i -= 1) sorted[i].y = Math.min(sorted[i].y, sorted[i + 1].y - gap);
+    for (let i = n - 2; i >= 0; i -= 1) sorted[i].y = Math.min(sorted[i].y, sorted[i + 1].y - between(sorted[i], sorted[i + 1]));
   }
   return sorted;
 }
@@ -118,17 +125,18 @@ export function labelRoom(labels, narrow) {
  * Each item is { id, label, y, stroke, dash }, with `y` the line's last value in pixels.
  */
 export function LineLabels({ items, width, height, narrow = false, dim }) {
-  const gap = narrow ? 27 : 16;
+  // Centers sit half of each label's height apart plus clear space; two-line labels need more room than one-line ones.
+  const extent = (item) => (item.parts.length - 1) * LINE + 12;
   const placed = spread(
-    items.map((item) => ({ ...item, end: item.y })),
-    gap,
+    items.map((item) => ({ ...item, end: item.y, parts: lines(item.label, narrow) })),
+    (a, b) => (extent(a) + extent(b)) / 2 + (narrow ? 7 : 4),
     0,
     height,
   );
   return (
     <g>
       {placed.map((item) => {
-        const parts = lines(item.label, narrow);
+        const { parts } = item;
         return (
           <g key={item.id} style={{ opacity: dim?.(item.id) ?? 1 }}>
             <path className="fb-leader" d={`M${width + 2} ${item.end}L${width + 8} ${item.y}`} />
@@ -139,9 +147,9 @@ export function LineLabels({ items, width, height, narrow = false, dim }) {
               y2={item.y}
               style={{ stroke: item.stroke, strokeWidth: 2, strokeDasharray: item.dash }}
             />
-            <text className="direct-label" x={width + 22} y={item.y - ((parts.length - 1) * 13) / 2}>
+            <text className="direct-label" x={width + 22} y={item.y - ((parts.length - 1) * LINE) / 2}>
               {parts.map((part, i) => (
-                <tspan key={part} x={width + 22} dy={i ? 13 : "0.32em"}>
+                <tspan key={part} x={width + 22} dy={i ? LINE : "0.32em"}>
                   {part}
                 </tspan>
               ))}
@@ -151,6 +159,92 @@ export function LineLabels({ items, width, height, narrow = false, dim }) {
       })}
     </g>
   );
+}
+
+/**
+ * Approximate rendered width of a chart label in Archivo at `size` pixels: figures are tabular and wide, spaces and
+ * punctuation narrow. `bold` is for the semibold label weight.
+ */
+export function labelWidth(text, size = 12, bold = true) {
+  let em = 0;
+  for (const ch of text) {
+    if (/[0-9%]/.test(ch)) em += 0.6;
+    else if (/[\s.,:;]/.test(ch)) em += 0.27;
+    else em += bold ? 0.52 : 0.47;
+  }
+  return em * size;
+}
+
+/** True when the segment from a to b passes through the box { x0, y0, x1, y1 }. */
+function crosses([ax, ay], [bx, by], box) {
+  let t0 = 0;
+  let t1 = 1;
+  const dx = bx - ax;
+  const dy = by - ay;
+  const edges = [
+    [-dx, ax - box.x0],
+    [dx, box.x1 - ax],
+    [-dy, ay - box.y0],
+    [dy, box.y1 - ay],
+  ];
+  for (const [p, q] of edges) {
+    if (p === 0) {
+      if (q < 0) return false;
+    } else {
+      const t = q / p;
+      if (p < 0) t0 = Math.max(t0, t);
+      else t1 = Math.min(t1, t);
+      if (t0 > t1) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Chooses where a point label goes. `text` is a string or an array of lines set `leading` apart. Each candidate is
+ * { x, y, anchor } with `y` the first baseline; the first one that no polyline in `lines`, no box in `taken` and no
+ * chart edge (`bounds`) touches wins, otherwise the one touched least. Returns the candidate with its `box`, `score`
+ * and `clear`, which is false when something still touches it and the label needs a halo.
+ */
+export function placeLabel(text, candidates, { lines = [], taken = [], bounds, size = 12, bold = true, pad = 3, leading = 14 }) {
+  const rows = Array.isArray(text) ? text : [text];
+  const w = Math.max(...rows.map((row) => labelWidth(row, size, bold)));
+  let best = null;
+  for (const candidate of candidates) {
+    const left = candidate.anchor === "end" ? candidate.x - w : candidate.anchor === "middle" ? candidate.x - w / 2 : candidate.x;
+    const box = {
+      x0: left - pad,
+      x1: left + w + pad,
+      y0: candidate.y - size * 0.8 - pad,
+      y1: candidate.y + (rows.length - 1) * leading + size * 0.2 + pad,
+    };
+    let hits = 0;
+    for (const points of lines) {
+      for (let i = 1; i < points.length; i += 1) {
+        if (crosses(points[i - 1], points[i], box)) {
+          hits += 1;
+          break;
+        }
+      }
+    }
+    const overlaps = taken.filter((t) => t.x0 < box.x1 && box.x0 < t.x1 && t.y0 < box.y1 && box.y0 < t.y1).length;
+    const outside = bounds && (box.x0 < bounds.x0 || box.x1 > bounds.x1 || box.y0 < bounds.y0 || box.y1 > bounds.y1) ? 1 : 0;
+    const score = overlaps * 100 + outside * 10 + hits;
+    if (!best || score < best.score) best = { ...candidate, box, score, clear: score === 0 };
+    if (score === 0) break;
+  }
+  return best;
+}
+
+/** Candidate spots around a point, nearest corners first in the given order of sides. */
+export function around(x, y, { dx = 8, above = 9, below = 17, order = ["below-left", "above-left", "below-right", "above-right"] } = {}) {
+  const spots = {
+    "below-left": { x: x - dx, y: y + below, anchor: "end" },
+    "above-left": { x: x - dx, y: y - above, anchor: "end" },
+    "below-right": { x: x + dx, y: y + below, anchor: "start" },
+    "above-right": { x: x + dx, y: y - above, anchor: "start" },
+  };
+  return order.map((side) => spots[side]);
 }
 
 /** Ticks for a removal-fraction axis that runs to about one half. */

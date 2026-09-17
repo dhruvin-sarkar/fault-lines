@@ -154,6 +154,14 @@
   fill: var(--ink-2);
 }
 
+/* Paper-colored outline behind a label that a line has to cross. */
+.chart .fb-halo {
+  paint-order: stroke;
+  stroke: var(--paper);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
 .chart .fb-column {
   font-size: 12px;
   font-weight: 600;

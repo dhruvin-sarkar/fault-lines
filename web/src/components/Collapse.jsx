@@ -220,6 +220,16 @@ export default function Collapse({ meta, percolation, types, atlas }) {
 
   const togglePin = useCallback((id) => setPinned((current) => (current === id ? null : id)), []);
 
+  // A click on a map or line leaves focus outside the figure, so Escape is heard on the document while a pin is set.
+  useEffect(() => {
+    if (!pinned) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape" && !event.defaultPrevented) setPinned(null);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [pinned]);
+
   const paths = useRef({ key: "", value: null });
   function geometry(inner) {
     const key = `${metric}|${inner.width}|${inner.height}`;
@@ -328,9 +338,6 @@ export default function Collapse({ meta, percolation, types, atlas }) {
             className={`race ${active ? "has-focus" : ""}`}
             ref={viewRef}
             style={motion}
-            onKeyDown={(event) => {
-              if (event.key === "Escape" && pinned) setPinned(null);
-            }}
           >
             <div className="race-main" ref={mainRef}>
               <div

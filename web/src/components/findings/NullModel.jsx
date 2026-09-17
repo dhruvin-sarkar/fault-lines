@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Finding, Pending, useResult } from "./Finding.jsx";
+import { Finding, useResult } from "./Finding.jsx";
 import { inkColor as ink } from "./marks.jsx";
 import { useRovingRows } from "./useRovingRows.js";
 import { ChartFrame, Row, Tooltip } from "../Chart.jsx";
@@ -16,6 +16,8 @@ const METRICS = [
   { value: "auc_reachability", label: "Reachable pairs" },
 ];
 const P_TICKS = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1];
+// Ensemble size fixed in the pre-registration; the size actually scored is read from nulls.json.
+const PLANNED_NULLS = 200;
 
 /** p to four decimals, the resolution of an empirical p over a few hundred graphs. */
 const p4 = (p) => fixed(p, 4);
@@ -388,19 +390,43 @@ function ResultText({ strategies, data, complete }) {
   );
 }
 
+/** The chapter while the randomized ensemble is still computing: the test as registered, and no results. */
+function Planned({ meta }) {
+  const orders = meta.strategies.length;
+  return (
+    <Finding id={ID} title={NEUTRAL_TITLE}>
+      <TextBlock
+        notes={
+          <Sidenote title="Degree-preserving randomization">
+            Each randomized graph keeps every cell type&apos;s number of inputs and outputs and its output synapse
+            total, but reassigns who connects to whom.
+          </Sidenote>
+        }
+      >
+        <p>
+          Is the real wiring more fragile than its degrees alone would make it? This chapter compares it with{" "}
+          {count(PLANNED_NULLS)} degree-preserving randomizations of the graph.
+        </p>
+        <p>
+          All {numberWord(orders)} removal orders are rerun on every randomized graph. For each order, a one-sided test
+          asks whether routing in the real graph collapses sooner, at a Bonferroni-corrected threshold of 0.05 /{" "}
+          {orders} = {p4(0.05 / orders)}.
+        </p>
+      </TextBlock>
+      <p className="fa-planned" role="status">
+        The randomized graphs are still being scored, so no comparison is shown yet. The design was fixed in advance
+        and is set out in <a href="#methods-validation">Validation</a>.
+      </p>
+    </Finding>
+  );
+}
+
 export default function NullModel({ meta }) {
   const { data, missing } = useResult("nulls.json");
   const [metric, setMetric] = useState("auc_flow");
   const reduced = useReducedMotion();
 
-  if (missing) {
-    return (
-      <Pending id={ID} title={NEUTRAL_TITLE}>
-        The ensemble of degree-preserving randomized graphs is still being computed; its design is fixed in{" "}
-        <a href="#methods-validation">Validation</a>.
-      </Pending>
-    );
-  }
+  if (missing) return <Planned meta={meta} />;
   if (!data) return null;
 
   const strategies = meta.strategies.filter((s) => data.strategies[s.id]);

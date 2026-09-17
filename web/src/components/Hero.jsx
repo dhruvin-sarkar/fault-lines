@@ -74,48 +74,52 @@ export default function Hero({ meta, percolation, types, atlas }) {
           </p>
         </div>
 
-        <div className="hero-atlas">
-          <Atlas
-            tone="field"
-            types={types}
-            atlas={atlas}
-            batch={batch}
-            removedAt={types.removed[LEAD]}
-            silencedAt={types.silenced[LEAD]}
-            ghostAlpha={0}
-            label={step.mapLabel}
-          />
-        </div>
-
-        <div className="hero-scrub">
-          <div className="hero-scrub-read">
-            <label htmlFor={id}>
-              Types removed <span className="hero-scrub-value" aria-hidden="true">{percent(step.fraction)}</span>
-            </label>
-            <span className="hero-readout" aria-hidden="true">
-              Flow capacity: <span className={step.halved ? "is-halved" : ""}>{percent(step.share)}</span> of intact
-            </span>
-          </div>
-          <div className="hero-scrub-track" style={{ "--at": batch / scale.last, "--mark": scale.mark }}>
-            <span className="hero-scrub-rail" aria-hidden="true" />
-            <span className="hero-scrub-mark" aria-hidden="true" />
-            <input
-              id={id}
-              type="range"
-              min={0}
-              max={scale.last}
-              step={1}
-              value={batch}
-              aria-valuetext={step.valueText}
-              onChange={(event) => setBatch(Number(event.target.value))}
+        <div className="hero-stage">
+          <div className="hero-atlas">
+            <Atlas
+              tone="field"
+              types={types}
+              atlas={atlas}
+              batch={batch}
+              removedAt={types.removed[LEAD]}
+              silencedAt={types.silenced[LEAD]}
+              ghostAlpha={0}
+              label={step.mapLabel}
             />
           </div>
-        </div>
 
-        <p className="hero-caption">
-          Each point is a cell type, placed where it makes synapses. Red: removed at this step. Dim: cut off from sensory
-          input. The tick marks where flow halves.
-        </p>
+          <div className="hero-scrub">
+            <div className="hero-scrub-read">
+              <label htmlFor={id}>
+                Types removed <span className="hero-scrub-value" aria-hidden="true">{percent(step.fraction)}</span>
+              </label>
+              <span className="hero-readout" aria-hidden="true">
+                Flow capacity <span className={step.halved ? "is-halved" : ""}>{percent(step.share)}</span> of intact
+              </span>
+            </div>
+            <div className="hero-scrub-track" style={{ "--at": batch / scale.last, "--mark": scale.mark }}>
+              <span className="hero-scrub-rail" aria-hidden="true" />
+              <span className="hero-scrub-mark" aria-hidden="true" />
+              <input
+                id={id}
+                type="range"
+                min={0}
+                max={scale.last}
+                step={1}
+                value={batch}
+                aria-valuetext={step.valueText}
+                onChange={(event) => setBatch(Number(event.target.value))}
+              />
+            </div>
+          </div>
+
+          <p className="hero-caption">
+            Each point is a cell type, placed where it makes synapses. Red: removed at this step. Dim: cut off from sensory
+            input. The slider steps through removal batches and opens on the first below half, at{" "}
+            {percent(scale.steps[scale.halving].fraction)}; the tick marks {percent(lead.critical_fraction)}, where flow
+            crosses half.
+          </p>
+        </div>
       </div>
     </section>
   );

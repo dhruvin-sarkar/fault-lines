@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { useRovingRows } from "./useRovingRows.js";
 import { ChartFrame, Row, Tooltip } from "../Chart.jsx";
 import { Figure, Keynote, Segmented, Sidenote, TextBlock } from "../ui.jsx";
 import { Finding, Pending, useResult } from "./Finding.jsx";
-import { ALTERNATIVES, LogAxes, PValue, Pow, inkColor, verdict } from "./marks.jsx";
+import { ALTERNATIVES, LogAxes, PValue, Pow, inkColor, labelWidth, placeLabel, verdict } from "./marks.jsx";
 import { count, fixed, percent, sentence, signedFixed, strategyLabel } from "../../lib/format.js";
 import { useWidth } from "../../lib/hooks.js";
 import { line, log } from "../../lib/scales.js";
@@ -259,8 +259,13 @@ function Strip({ rows, active, onPick }) {
   );
   const decades = Math.max(1, Math.ceil(Math.log10(Math.max(...rows.map((r) => r.total_cut_off), 10))));
   const at = (v) => `${(100 * Math.log10(Math.max(1, v))) / decades}%`;
+  const describedBy = useId();
   return (
     <>
+      <span id={describedBy} hidden>
+        Types cut off by the run in total, and by its largest single cascade. Selecting a strategy marks its cascade
+        sizes in the chart above.
+      </span>
       <ul className="fb-strip" aria-label="Types cut off per strategy">
         {rows.map((r) => (
           <li key={r.id}>
@@ -268,7 +273,7 @@ function Strip({ rows, active, onPick }) {
               {...rowProps(r.id)}
               type="button"
               aria-pressed={active === r.id}
-              aria-label={`${strategyLabel(r.id)}: ${count(r.total_cut_off)} types cut off in total, largest cascade ${count(r.max_size)}`}
+              aria-describedby={describedBy}
               onClick={() => onPick(r.id)}
               className={active && active !== r.id ? "is-dim" : ""}
             >
@@ -367,6 +372,47 @@ function CascadeChart({ points, fit, active, labels, largestLabel }) {
           const anchor = fitPoints[Math.round(steps * 0.6)];
           const largest = points[points.length - 1];
           const tailX = xs(fit.xmin);
+          const fitX = Math.max(fitLabel.length * 6.4, anchor[0] - 6);
+          const fitY = Math.min(inner.height - 8, anchor[1] + 22);
+          let largestSpot = null;
+          if (largest) {
+            const px = xs(largest.size);
+            const py = ys(largest.p);
+            const text = `${count(largest.size)} types in one batch${!narrow && largestLabel ? `, ${largestLabel}` : ""}`;
+            const stacked = [`${count(largest.size)} types`, `in one batch${!narrow && largestLabel ? `, ${largestLabel}` : ""}`];
+            // Dots are short crosses, so a label may sit near a dot but never on one.
+            const dots = points.flatMap((d) => {
+              const [x, y] = [xs(d.size), ys(d.p)];
+              return [[[x - 5, y], [x + 5, y]], [[x, y - 5], [x, y + 5]]];
+            });
+            const taken = [
+              { x0: fitX - labelWidth(fitLabel), x1: fitX, y0: fitY - 12, y1: fitY + 3 },
+              { x0: tailX, x1: tailX + labelWidth(`Fitted tail from size ${count(fit.xmin)}`, 11) + 6, y0: 0, y1: 18 },
+            ];
+            const options = { lines: [fitPoints, ...dots], taken, bounds: { x0: 0, y0: 0, x1: inner.width + margin.right, y1: inner.height } };
+            // One line beside the dot where it fits; otherwise two lines stacked above it, clear of the fitted line.
+            const tries = [
+              {
+                rows: [text],
+                spot: placeLabel(text, [
+                  { x: px - 10, y: py - 12, anchor: "end" },
+                  { x: px - 12, y: py + 4, anchor: "end" },
+                  { x: px - 10, y: py + 20, anchor: "end" },
+                ], options),
+              },
+              {
+                rows: stacked,
+                spot: placeLabel(stacked, [
+                  { x: px + 8, y: py - 30, anchor: "end" },
+                  { x: px - 10, y: py - 30, anchor: "end" },
+                  { x: px + 8, y: py - 46, anchor: "end" },
+                  { x: px - 12, y: py + 18, anchor: "end" },
+                ], options),
+              },
+            ];
+            const chosen = tries.find((t) => t.spot.clear) ?? tries[0];
+            largestSpot = { ...chosen.spot, rows: chosen.rows };
+          }
           return (
             <g>
               <rect className="fb-tail" x={tailX} y={0} width={inner.width - tailX} height={inner.height} />
@@ -382,12 +428,7 @@ function CascadeChart({ points, fit, active, labels, largestLabel }) {
                 Fitted tail from size {count(fit.xmin)}
               </text>
               <path className="fb-fit" d={line(fitPoints)} />
-              <text
-                className="direct-label"
-                x={Math.max(fitLabel.length * 6.4, anchor[0] - 6)}
-                y={Math.min(inner.height - 8, anchor[1] + 22)}
-                textAnchor="end"
-              >
+              <text className="direct-label" x={fitX} y={fitY} textAnchor="end">
                 {fitLabel}
               </text>
               {points.map((d, i) => {
@@ -405,9 +446,18 @@ function CascadeChart({ points, fit, active, labels, largestLabel }) {
                   />
                 );
               })}
-              {largest && (
-                <text className="fb-value" x={xs(largest.size) - 10} y={ys(largest.p) - 12} textAnchor="end">
-                  {count(largest.size)} types in one batch{!narrow && largestLabel ? `, ${largestLabel}` : ""}
+              {largestSpot && (
+                <text
+                  className={`fb-value${largestSpot.clear ? "" : " fb-halo"}`}
+                  x={largestSpot.x}
+                  y={largestSpot.y}
+                  textAnchor={largestSpot.anchor}
+                >
+                  {largestSpot.rows.map((row, i) => (
+                    <tspan key={row} x={largestSpot.x} dy={i ? 14 : 0}>
+                      {row}
+                    </tspan>
+                  ))}
                 </text>
               )}
             </g>

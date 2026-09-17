@@ -1,15 +1,17 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { useWidth } from "../lib/hooks.js";
+import { useNear, useWidth } from "../lib/hooks.js";
 
 export const MARGIN = { top: 32, right: 18, bottom: 46, left: 54 };
 
 /**
  * Responsive SVG chart. `children` receives the inner plotting size; `onPointer` receives pointer
  * coordinates inside the plotting area so charts can drive a crosshair or pick the nearest mark.
- * Nothing is drawn until the container has been measured. Interactive charts pass `role="group"`.
+ * Nothing is drawn until the container has been measured and is near the viewport; the empty frame keeps the same
+ * height, so the page does not move when a chart is drawn. Interactive charts pass `role="group"`.
  */
 export function ChartFrame({ height = 360, margin = MARGIN, label, children, overlay, onPointer, onLeave, role = "img" }) {
   const [ref, width] = useWidth();
+  const near = useNear(ref);
   const svgRef = useRef(null);
   const inner = { width: Math.max(10, width - margin.left - margin.right), height: height - margin.top - margin.bottom };
 
@@ -19,7 +21,7 @@ export function ChartFrame({ height = 360, margin = MARGIN, label, children, ove
     onPointer(event.clientX - rect.left - margin.left, event.clientY - rect.top - margin.top, inner);
   }
 
-  if (!width) return <div className="chart" ref={ref} style={{ height }} />;
+  if (!width || !near) return <div className="chart" ref={ref} style={{ height }} />;
 
   return (
     <div className="chart" ref={ref}>

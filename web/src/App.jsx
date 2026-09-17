@@ -7,6 +7,7 @@ import Lookup from "./components/Lookup.jsx";
 import Methods, { Footer } from "./components/Methods.jsx";
 import SectionBoundary from "./components/SectionBoundary.jsx";
 import { useData } from "./lib/data.js";
+import { useHashLanding } from "./lib/landing.js";
 
 export default function App() {
   const meta = useData("meta.json");
@@ -16,6 +17,7 @@ export default function App() {
   const error = meta.error || percolation.error || types.error || atlas.error;
   const ready = meta.data && percolation.data && types.data && atlas.data;
   const shared = ready && { meta: meta.data, percolation: percolation.data, types: types.data, atlas: atlas.data };
+  useHashLanding(Boolean(shared));
 
   return (
     <>
@@ -76,15 +78,17 @@ function HeroSkeleton() {
           </p>
           <p className="hero-answer">Loading cell types and the removal experiments run on them.</p>
         </div>
-        <div className="hero-atlas" />
-        <div className="hero-scrub" aria-hidden="true">
-          <div className="hero-scrub-read">&nbsp;</div>
-          <div className="hero-scrub-track" />
+        <div className="hero-stage">
+          <div className="hero-atlas" />
+          <div className="hero-scrub" aria-hidden="true">
+            <div className="hero-scrub-read">&nbsp;</div>
+            <div className="hero-scrub-track" />
+          </div>
+          <p className="hero-caption">
+            Each point is a cell type, placed where it makes synapses. Red: removed at this step. Dim: cut off from sensory
+            input. The slider steps through removal batches; the tick marks where flow crosses half.
+          </p>
         </div>
-        <p className="hero-caption">
-          Each point is a cell type, placed where it makes synapses. Red: removed at this step. Dim: cut off from sensory
-          input. The tick marks where flow halves.
-        </p>
       </div>
     </section>
   );

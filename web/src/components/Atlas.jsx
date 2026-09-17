@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useTokens } from "../lib/hooks.js";
+import { useNear, useTokens } from "../lib/hooks.js";
 
 const TOKENS = ["ink", "muted", "signal", "signal-glow", "tissue", "tissue-edge",
   "field-ink", "field-ink-3", "field-rule", "field-tissue", "field-ghost", "field-live"];
@@ -21,11 +21,24 @@ function palette(colors, tone) {
     ghost: colors["tissue-edge"], silent: colors.muted, signal: colors.signal, blend: "source-over" };
 }
 
+// Every map on the page draws the same outlines and points, so parsed paths and extents are shared per data object.
+const parsedOutlines = new WeakMap();
+const extents = new WeakMap();
+
 function parsePaths(outlines) {
-  return outlines.map((o) => ({ ...o, path2d: new Path2D(o.path) }));
+  if (!parsedOutlines.has(outlines)) parsedOutlines.set(outlines, outlines.map((o) => ({ ...o, path2d: new Path2D(o.path) })));
+  return parsedOutlines.get(outlines);
 }
 
 function bounds(types, outlinePath) {
+  const cached = extents.get(types);
+  if (cached?.outlinePath === outlinePath) return cached.value;
+  const value = measureBounds(types, outlinePath);
+  extents.set(types, { outlinePath, value });
+  return value;
+}
+
+function measureBounds(types, outlinePath) {
   const numbers = outlinePath.match(/-?\d+(\.\d+)?/g).map(Number);
   let x0 = Infinity;
   let x1 = -Infinity;
@@ -87,6 +100,7 @@ export default function Atlas({
   const box = useRef(null);
   const canvas = useRef(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
+  const near = useNear(box);
   const colors = useTokens(TOKENS);
   const outlines = useMemo(() => parsePaths(atlas.outlines), [atlas]);
   const extent = useMemo(() => bounds(types, atlas.cns_outline), [types, atlas]);
@@ -108,7 +122,7 @@ export default function Atlas({
 
   useEffect(() => {
     const el = canvas.current;
-    if (!el || !size.w || !size.h || !colors.ink) return;
+    if (!el || !near || !size.w || !size.h || !colors.ink) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const width = Math.round(size.w * dpr);
     const height = Math.round(size.h * dpr);
@@ -201,7 +215,7 @@ export default function Atlas({
       ctx.fillStyle = mark;
       ctx.fillRect(px(focus) - r, py(focus) - r, r * 2, r * 2);
     }
-  }, [size, colors, ink, outlines, extent, types, batch, removedAt, silencedAt, regionFill, activeRegion, highlight, focus, pointAlpha, ghostAlpha, silentColor, silentAlpha, highlightTone, tone]);
+  }, [near, size, colors, ink, outlines, extent, types, batch, removedAt, silencedAt, regionFill, activeRegion, highlight, focus, pointAlpha, ghostAlpha, silentColor, silentAlpha, highlightTone, tone]);
 
   function pointer(event) {
     if (!onRegion && !onType) return;

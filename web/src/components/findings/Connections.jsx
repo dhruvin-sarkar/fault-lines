@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ChartFrame, Row, Tooltip, XAxis, YAxis } from "../Chart.jsx";
 import { Figure, Keynote, Segmented, TextBlock } from "../ui.jsx";
 import { Finding, Pending, useResult } from "./Finding.jsx";
-import { LineLabels, inkColor, labelRoom, xTicks } from "./marks.jsx";
+import { LineLabels, around, inkColor, labelRoom, placeLabel, xTicks } from "./marks.jsx";
 import { count, indexAt, percent, strategyLabel, sentence } from "../../lib/format.js";
 import { useWidth } from "../../lib/hooks.js";
 import { line, linear } from "../../lib/scales.js";
@@ -209,6 +209,48 @@ function ConnectionsChart({ data, orders, random }) {
             const xs = linear([0, xMax], [0, inner.width]);
             const ys = linear([0, 1], [inner.height, 0]);
             const half = ys(0.5);
+            const curves = orders.map((o) => data.orders[o.id][metric].map((_, i) => [xs(fractions[i]), ys(share(o.id, i))]));
+            const bounds = { x0: 0, y0: 0, x1: inner.width, y1: inner.height };
+            const taken = [];
+            const halvings =
+              metric === "flow"
+                ? orders
+                    .filter((o) => data.orders[o.id].critical_fraction != null)
+                    .map((o) => {
+                      const f = data.orders[o.id].critical_fraction;
+                      const x = xs(f);
+                      const drops = orders
+                        .map((d) => data.orders[d.id].critical_fraction)
+                        .filter((v) => v != null)
+                        .map((v) => [[xs(v), half], [xs(v), inner.height]]);
+                      // Beside the red dot if there is room, else at the foot of its drop line; the note on the mean
+                      // is dropped before a line is allowed through the label, and the caption carries it.
+                      const candidates = [
+                        ...around(x, half),
+                        { x: x - 6, y: inner.height - 8, anchor: "end" },
+                        { x: x + 6, y: inner.height - 8, anchor: "start" },
+                      ];
+                      const texts = [percent(f)];
+                      if (o.id === "random" && random?.trials) texts.unshift(`${percent(f)}, mean of ${count(random.trials)}`);
+                      const options = { lines: [...curves, ...drops], taken, bounds };
+                      const tries = texts.map((text) => ({ text, spot: placeLabel(text, candidates, options) }));
+                      const { text, spot } = tries.find((t) => t.spot.clear) ?? tries[0];
+                      taken.push(spot.box);
+                      return { order: o, f, text, spot };
+                    })
+                : [];
+            const note = placeLabel(
+              "Half of intact",
+              [
+                { x: 6, y: half - 7, anchor: "start" },
+                { x: 6, y: half + 15, anchor: "start" },
+                { x: inner.width - 4, y: half - 7, anchor: "end" },
+                { x: inner.width - 4, y: half + 15, anchor: "end" },
+              ],
+              { lines: curves, taken, bounds, size: 11, bold: false },
+            );
+            // The note never covers a value label; the 50% tick and the caption already name the line.
+            const showNote = note.score < 100;
             return (
               <>
                 <YAxis
@@ -227,39 +269,32 @@ function ConnectionsChart({ data, orders, random }) {
                   title="Connections removed"
                 />
                 <line className="fb-ref" x1={0} x2={inner.width} y1={half} y2={half} />
-                <text className="fb-note" x={6} y={half + 16}>
-                  Half of intact
-                </text>
-                {orders.map((o) => (
-                  <path
-                    key={o.id}
-                    className="fb-series"
-                    d={line(data.orders[o.id][metric].map((_, i) => [xs(fractions[i]), ys(share(o.id, i))]))}
-                    style={{ stroke: o.stroke, strokeDasharray: o.dash }}
-                  />
+                {showNote && (
+                  <text className={`fb-note${note.clear ? "" : " fb-halo"}`} x={note.x} y={note.y} textAnchor={note.anchor}>
+                    Half of intact
+                  </text>
+                )}
+                {orders.map((o, k) => (
+                  <path key={o.id} className="fb-series" d={line(curves[k])} style={{ stroke: o.stroke, strokeDasharray: o.dash }} />
                 ))}
-                {metric === "flow" &&
-                  orders.map((o) => {
-                    const f = data.orders[o.id].critical_fraction;
-                    if (f == null) return null;
-                    const range = o.id === "random" ? random?.range : null;
-                    return (
-                      <g key={o.id}>
-                        <line className="fb-drop" x1={xs(f)} x2={xs(f)} y1={half} y2={inner.height} />
-                        {range && (
-                          <path
-                            className="fb-bracket"
-                            d={`M${xs(range[0])} ${half - 5}V${half + 5}M${xs(range[0])} ${half}H${xs(range[1])}M${xs(range[1])} ${half - 5}V${half + 5}`}
-                          />
-                        )}
-                        <circle className="fb-halving" cx={xs(f)} cy={half} r={4.5} />
-                        <text className="fb-value" x={xs(f) + (o.id === "random" ? -8 : 8)} y={o.id === "random" ? half + 20 : half - 12} textAnchor={o.id === "random" ? "end" : "start"}>
-                          {percent(f)}
-                          {o.id === "random" && random?.trials ? `, mean of ${count(random.trials)}` : ""}
-                        </text>
-                      </g>
-                    );
-                  })}
+                {halvings.map(({ order: o, f, text, spot }) => {
+                  const range = o.id === "random" ? random?.range : null;
+                  return (
+                    <g key={o.id}>
+                      <line className="fb-drop" x1={xs(f)} x2={xs(f)} y1={half} y2={inner.height} />
+                      {range && (
+                        <path
+                          className="fb-bracket"
+                          d={`M${xs(range[0])} ${half - 5}V${half + 5}M${xs(range[0])} ${half}H${xs(range[1])}M${xs(range[1])} ${half - 5}V${half + 5}`}
+                        />
+                      )}
+                      <circle className="fb-halving" cx={xs(f)} cy={half} r={4.5} />
+                      <text className={`fb-value${spot.clear ? "" : " fb-halo"}`} x={spot.x} y={spot.y} textAnchor={spot.anchor}>
+                        {text}
+                      </text>
+                    </g>
+                  );
+                })}
                 {hover != null && (
                   <g>
                     <line className="fb-crosshair" x1={xs(fractions[hover])} x2={xs(fractions[hover])} y1={0} y2={inner.height} />

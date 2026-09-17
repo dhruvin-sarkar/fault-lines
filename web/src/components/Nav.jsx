@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { repoUrl } from "../lib/data.js";
+import { useReducedMotion } from "../lib/hooks.js";
 
 const LINKS = [
   ["measure", "The measure"],
@@ -12,6 +13,22 @@ const LINKS = [
 /** Site bar; `ready` tells it the sections have rendered so it can mark the one being read. */
 export default function Nav({ ready = true }) {
   const [current, setCurrent] = useState(null);
+  const strip = useRef(null);
+  const reduced = useReducedMotion();
+
+  // On narrow screens the links scroll sideways; bring the current one into the strip without moving the page.
+  useEffect(() => {
+    const box = strip.current;
+    const link = current && box?.querySelector(`a[href="#${current}"]`);
+    if (!link || box.scrollWidth <= box.clientWidth) return;
+    const edge = 32;
+    const outer = box.getBoundingClientRect();
+    const inner = link.getBoundingClientRect();
+    let delta = 0;
+    if (inner.left < outer.left) delta = inner.left - outer.left - 8;
+    else if (inner.right > outer.right - edge) delta = inner.right - outer.right + edge;
+    if (delta) box.scrollTo({ left: box.scrollLeft + delta, behavior: reduced ? "auto" : "smooth" });
+  }, [current, reduced]);
 
   useEffect(() => {
     if (!ready) return undefined;
@@ -55,7 +72,7 @@ export default function Nav({ ready = true }) {
           </svg>
           Fault Lines
         </a>
-        <nav className="nav-links" aria-label="Sections">
+        <nav className="nav-links" aria-label="Sections" ref={strip}>
           {LINKS.map(([id, label]) => (
             <a key={id} href={`#${id}`} className={current === id ? "is-current" : ""} aria-current={current === id ? "location" : undefined}>
               {label}

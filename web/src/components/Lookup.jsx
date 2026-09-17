@@ -82,6 +82,11 @@ export default function Lookup({ meta, percolation, types, atlas }) {
     const i = fromHash == null ? -1 : names.indexOf(fromHash);
     return i >= 0 ? i : ranking.order[0];
   });
+  // A linked name that matches no cell type; the hash is left as it is.
+  const [unknown, setUnknown] = useState(() => {
+    const fromHash = hashName();
+    return fromHash && !names.includes(fromHash) ? fromHash : null;
+  });
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
@@ -95,6 +100,7 @@ export default function Lookup({ meta, percolation, types, atlas }) {
     (i, { link = true } = {}) => {
       if (i == null || i < 0) return;
       setSelected(i);
+      setUnknown(null);
       setQuery("");
       setOpen(false);
       setActive(-1);
@@ -107,10 +113,11 @@ export default function Lookup({ meta, percolation, types, atlas }) {
   );
 
   useEffect(() => {
-    if (hashName() != null) document.getElementById("lookup")?.scrollIntoView();
     const onHash = () => {
       const name = hashName();
-      if (name != null && index.has(name)) choose(index.get(name), { link: false });
+      if (name == null) return;
+      if (index.has(name)) choose(index.get(name), { link: false });
+      else setUnknown(name || null);
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
@@ -169,6 +176,13 @@ export default function Lookup({ meta, percolation, types, atlas }) {
             it out. Search by name, start from the types whose loss costs most, or pick a point on the map.
           </p>
         </div>
+
+        {unknown && (
+          <p className="fc-unknown" role="status">
+            No cell type is named &ldquo;{unknown}&rdquo;. Search for another name below, or pick one of the types
+            listed.
+          </p>
+        )}
 
         <div className="fc-lookup">
           <div className="fc-lookup-main">

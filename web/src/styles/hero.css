@@ -2,18 +2,12 @@
 .hero-frame {
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-  grid-template-rows: minmax(0, 1fr) auto auto;
-  grid-template-areas:
-    "copy atlas"
-    "copy scrub"
-    "copy caption";
   column-gap: clamp(2rem, 5vw, 5.5rem);
   height: max(36rem, calc(100svh - var(--nav-height)));
   padding-block: clamp(1.5rem, 4svh, 3rem);
 }
 
 .hero-plate-copy {
-  grid-area: copy;
   align-self: center;
   max-width: 34rem;
   padding-bottom: 2rem;
@@ -65,17 +59,30 @@
   text-decoration-color: var(--field-ink);
 }
 
+/*
+ * The atlas, its scale and caption stay together in the middle of the column. The atlas is about as tall as it is
+ * wide and shrinks only when the viewport is too short for it, so tall screens get no empty band under the map.
+ */
+.hero-stage {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+}
+
 .hero-atlas {
-  grid-area: atlas;
   position: relative;
+  flex: 0 1 auto;
+  aspect-ratio: 1;
   min-height: 0;
 }
 
 /* Removal scale: one range input over a drawn rail, so the halving mark lines up with the thumb. */
 .hero-scrub {
   --thumb: 0.875rem;
-  grid-area: scrub;
-  justify-self: center;
+  flex: none;
+  align-self: center;
   width: min(30rem, 100%);
   padding-top: 1rem;
 }
@@ -98,15 +105,14 @@
   color: var(--field-ink);
 }
 
-/* Fixed widths keep the text still while the values change under a drag. */
+/* A fixed width keeps the label still while the value changes under a drag; the readout sits flush right and needs none. */
 .hero-scrub-value {
   display: inline-block;
   min-width: 5ch;
 }
 
-.hero-readout span {
-  display: inline-block;
-  min-width: 5ch;
+.hero-readout {
+  margin-left: auto;
   text-align: right;
 }
 
@@ -199,8 +205,8 @@
 }
 
 .hero-caption {
-  grid-area: caption;
-  justify-self: center;
+  flex: none;
+  align-self: center;
   max-width: 36rem;
   margin-top: 0.25rem;
   font-family: var(--sans);
@@ -219,7 +225,8 @@
     height: auto;
     padding-block: 2.25rem 3rem;
   }
-  .hero-plate-copy {
+  .hero-plate-copy,
+  .hero-stage {
     display: contents;
   }
   .hero-title {

@@ -317,6 +317,18 @@
 }
 
 /* Lookup */
+.fc-unknown {
+  max-width: 46rem;
+  margin-bottom: 2rem;
+  padding: 0.1rem 0 0.1rem 0.9rem;
+  border-left: 2px solid var(--rule-strong);
+  font-family: var(--sans);
+  font-size: var(--step-0);
+  line-height: 1.5;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
 .fc-lookup {
   display: grid;
   grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);

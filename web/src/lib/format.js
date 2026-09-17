@@ -1,7 +1,10 @@
 export const percent = (value, digits = 1) =>
   value == null || Number.isNaN(value) ? "n/a" : `${(100 * value).toFixed(digits)}%`;
 
-export const count = (value) => (value == null ? "n/a" : Math.round(value).toLocaleString("en-US"));
+// One shared formatter: toLocaleString builds a new one on every call, which is slow over thousands of values.
+const GROUPED = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+
+export const count = (value) => (value == null ? "n/a" : GROUPED.format(Math.round(value)));
 
 export const fixed = (value, digits = 2) => (value == null ? "n/a" : Number(value).toFixed(digits));
 
