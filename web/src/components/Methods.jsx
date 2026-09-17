@@ -1,6 +1,6 @@
 import { Sidenote, TextBlock } from "./ui.jsx";
 import { useResult } from "./findings/Finding.jsx";
-import { blobUrl, repoUrl } from "../lib/data.js";
+import { blobUrl, reportUrl, repoUrl } from "../lib/data.js";
 import { count, fixed, percent, sentence } from "../lib/format.js";
 import "../styles/methods.css";
 
@@ -11,7 +11,6 @@ const PREREGISTRATION_COMMIT = "0e72491";
 const WORKERS_DEFAULT = 4;
 
 const SISTER_PROJECT = "https://github.com/dhruvin-sarkar/ConnectomeLens";
-const REPORT_PDF = blobUrl("paper/report.pdf");
 const RESULTS_FOLDER = `${repoUrl}/tree/main/results`;
 
 const SENSORY_SUPERCLASSES = ["cb_sensory", "ol_sensory", "vnc_sensory", "sensory_ascending", "sensory_descending"];
@@ -223,7 +222,7 @@ export default function Methods({ meta }) {
           <p className="lede">
             How the graph was built, what was measured, how the results were checked, and where the conclusions stop.
             The parameters are the ones the pipeline ran with. The full account, with references, is in the{" "}
-            <a href={REPORT_PDF}>report</a>, and the code and every result file are in the{" "}
+            <a href={reportUrl}>report</a>, and the code and every result file are in the{" "}
             <a href={repoUrl}>repository</a>.
           </p>
         </header>
@@ -630,7 +629,7 @@ export default function Methods({ meta }) {
         <Part id="methods-report" title="Report and files">
           <TextBlock>
             <p>
-              The <a href={REPORT_PDF}>report</a> sets out the full methods, every result with its figure, and the
+              The <a href={reportUrl}>report</a> sets out the full methods, every result with its figure, and the
               references; its <a href={blobUrl("paper/report.md")}>Markdown source</a> sits beside it. The numbers on
               this site are exported from the pipeline&apos;s result files, which are in the{" "}
               <a href={RESULTS_FOLDER}>results folder</a> of the <a href={repoUrl}>repository</a> alongside the code
@@ -684,7 +683,7 @@ export function Footer({ meta }) {
                 <a href={repoUrl}>Repository</a>
               </li>
               <li>
-                <a href={REPORT_PDF}>Report (PDF)</a>
+                <a href={reportUrl}>Report (PDF)</a>
               </li>
               <li>
                 <a href={RESULTS_FOLDER}>Result files</a>

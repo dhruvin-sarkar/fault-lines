@@ -1,12 +1,11 @@
 import { useId, useMemo, useState } from "react";
 import Atlas from "./Atlas.jsx";
-import { blobUrl } from "../lib/data.js";
+import { reportUrl } from "../lib/data.js";
 import { count, numberWord, percent } from "../lib/format.js";
 import "../styles/hero.css";
 
 const LEAD = "out_strength";
 const MAX_FRACTION = 0.5;
-const REPORT_PDF = blobUrl("paper/report.pdf");
 
 /** Per-batch state of the removal scale under the lead strategy, computed once from the shared data. */
 function buildScale(percolation, atlas) {
@@ -71,7 +70,7 @@ export default function Hero({ meta, percolation, types, atlas }) {
           </p>
           <p className="hero-links">
             <a href="#collapse">Watch the {numberWord(attacks)} attacks</a>
-            <a href={REPORT_PDF}>Read the report</a>
+            <a href={reportUrl}>Read the report</a>
           </p>
         </div>
 

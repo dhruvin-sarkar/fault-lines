@@ -5,6 +5,7 @@ import Collapse from "./components/Collapse.jsx";
 import Findings from "./components/Findings.jsx";
 import Lookup from "./components/Lookup.jsx";
 import Methods, { Footer } from "./components/Methods.jsx";
+import SectionBoundary from "./components/SectionBoundary.jsx";
 import { useData } from "./lib/data.js";
 
 export default function App() {
@@ -34,16 +35,32 @@ export default function App() {
         {!error && !ready && <HeroSkeleton />}
         {shared && (
           <>
-            <Hero {...shared} />
-            <Measure {...shared} />
-            <Collapse {...shared} />
-            <Findings {...shared} />
-            <Lookup {...shared} />
-            <Methods {...shared} />
+            <SectionBoundary>
+              <Hero {...shared} />
+            </SectionBoundary>
+            <SectionBoundary id="measure">
+              <Measure {...shared} />
+            </SectionBoundary>
+            <SectionBoundary id="collapse">
+              <Collapse {...shared} />
+            </SectionBoundary>
+            <SectionBoundary id="findings">
+              <Findings {...shared} />
+            </SectionBoundary>
+            <SectionBoundary id="lookup">
+              <Lookup {...shared} />
+            </SectionBoundary>
+            <SectionBoundary id="methods">
+              <Methods {...shared} />
+            </SectionBoundary>
           </>
         )}
       </main>
-      {shared && <Footer {...shared} />}
+      {shared && (
+        <SectionBoundary>
+          <Footer {...shared} />
+        </SectionBoundary>
+      )}
     </>
   );
 }

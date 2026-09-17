@@ -12,6 +12,7 @@ import Structure from "./findings/Structure.jsx";
 import Pairs from "./findings/Pairs.jsx";
 import Bilateral from "./findings/Bilateral.jsx";
 import Bottleneck from "./findings/Bottleneck.jsx";
+import SectionBoundary from "./SectionBoundary.jsx";
 import { HeadingLevel, Sidenote } from "./ui.jsx";
 import { useResult } from "./findings/Finding.jsx";
 import { count, pClause, percent, superclassName } from "../lib/format.js";
@@ -278,7 +279,9 @@ export default function Findings(props) {
             <h3 className="fi-part">{part.title}</h3>
             <HeadingLevel level={4}>
               {part.chapters.map(([id, Chapter]) => (
-                <Chapter key={id} {...props} />
+                <SectionBoundary key={id} id={id} as="finding">
+                  <Chapter {...props} />
+                </SectionBoundary>
               ))}
             </HeadingLevel>
           </Fragment>

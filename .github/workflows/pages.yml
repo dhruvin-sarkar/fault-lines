@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "web/**"
+      - "paper/report.pdf"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 

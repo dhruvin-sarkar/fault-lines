@@ -40,3 +40,6 @@ export function useAvailable() {
 
 export const repoUrl = "https://github.com/dhruvin-sarkar/fault-lines";
 export const blobUrl = (path) => `${repoUrl}/blob/main/${path}`;
+
+/** The technical report, published beside the site by the build. */
+export const reportUrl = `${base}report.pdf`;
