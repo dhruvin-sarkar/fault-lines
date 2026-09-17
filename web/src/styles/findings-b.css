@@ -1,0 +1,607 @@
+/* Figures for the cut-off, connection, compartment, cascade and structure findings. */
+
+.fb-hit {
+  cursor: crosshair;
+  touch-action: pan-y;
+}
+
+/* Chart marks */
+.chart .fb-series {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  transition: opacity 160ms, d 480ms var(--ease);
+}
+
+.chart .fb-observed {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.chart .fb-fit {
+  fill: none;
+  stroke: var(--ink-2);
+  stroke-width: 1.75;
+  stroke-dasharray: 6 4;
+}
+
+.chart .fb-tail {
+  fill: var(--wash);
+  opacity: 0.6;
+}
+
+.chart .fb-grid {
+  stroke: var(--rule);
+  shape-rendering: crispEdges;
+}
+
+.chart .fb-tick {
+  stroke: var(--rule-strong);
+  shape-rendering: crispEdges;
+}
+
+.chart .fb-exp {
+  font-size: 8px;
+}
+
+.chart .fb-leader {
+  fill: none;
+  stroke: var(--rule-strong);
+  stroke-width: 1;
+}
+
+.chart .fb-ref {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.chart .fb-marker {
+  stroke: var(--ink-2);
+  stroke-width: 1.25;
+  stroke-dasharray: 3 3;
+}
+
+.chart .fb-crosshair {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+}
+
+.chart .fb-point {
+  stroke: var(--paper);
+  stroke-width: 1.5;
+}
+
+.chart .fb-drop {
+  stroke: var(--signal);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+.chart .fb-bracket {
+  fill: none;
+  stroke: var(--signal);
+  stroke-width: 1.5;
+}
+
+.chart .fb-halving {
+  fill: var(--signal);
+  stroke: var(--paper);
+  stroke-width: 2;
+}
+
+.chart .fb-post {
+  stroke: var(--rule);
+  shape-rendering: crispEdges;
+}
+
+.chart .fb-fade {
+  transition: opacity 160ms;
+}
+
+.chart .fb-band {
+  fill: var(--wash);
+}
+
+.chart .fb-dot {
+  fill: var(--paper);
+  stroke: var(--ink-3);
+  stroke-width: 1.5;
+  transition: opacity 160ms;
+}
+
+.chart .fb-dot.is-tail {
+  fill: var(--ink);
+  stroke: var(--paper);
+  stroke-width: 1;
+}
+
+.chart .fb-dot.is-faded {
+  opacity: 0.3;
+}
+
+.chart .fb-core line {
+  stroke: var(--rule-strong);
+  stroke-width: 1.5;
+}
+
+.chart .fb-core circle {
+  fill: var(--ink-2);
+}
+
+.chart .fb-core.is-deepest line {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.chart .fb-core.is-deepest circle {
+  fill: var(--ink);
+}
+
+/* Chart text roles */
+.chart .fb-value {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--ink);
+}
+
+.chart .fb-note {
+  font-size: 11px;
+  font-weight: 400;
+  fill: var(--ink-2);
+}
+
+.chart .fb-column {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--ink-2);
+}
+
+.fb-legend {
+  margin-bottom: 1rem;
+}
+
+.fb-legend svg {
+  flex: none;
+  overflow: visible;
+}
+
+.fb-glyph-ink {
+  fill: var(--ink);
+}
+
+.fb-glyph-ring {
+  fill: var(--paper);
+  stroke: var(--ink-3);
+  stroke-width: 1.5;
+}
+
+/* Tooltip content */
+.tooltip .fb-tip-head {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.tooltip .fb-tip-note {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: var(--step--2);
+  color: var(--ink-3);
+}
+
+/* Keys set as lists */
+.fb-key {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fb-key li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.fb-key svg {
+  flex: none;
+  overflow: visible;
+}
+
+.fb-square {
+  width: 0.55rem;
+  height: 0.55rem;
+  flex: none;
+}
+
+.field .fb-key {
+  color: var(--field-ink-2);
+}
+
+/* Cut off, still present: three atlases on the field */
+.fb-play svg {
+  width: 12px;
+  height: 12px;
+}
+
+.fb-maps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(0.75rem, 2.5vw, 2rem);
+}
+
+.fb-map {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.fb-map-head {
+  display: grid;
+  gap: 0.2rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--field-rule);
+  font-size: var(--step--1);
+  line-height: 1.35;
+  color: var(--field-ink-2);
+}
+
+.fb-map-head strong {
+  font-weight: 600;
+  color: var(--field-ink);
+}
+
+.fb-map-count {
+  font-family: var(--serif);
+  font-size: var(--step-3);
+  font-weight: 400;
+  font-variation-settings: "opsz" 48;
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1;
+  color: var(--field-ink);
+}
+
+.fb-map-count small {
+  margin-left: 0.4rem;
+  font-family: var(--sans);
+  font-size: var(--step--1);
+  color: var(--field-ink-3);
+}
+
+.fb-map-canvas {
+  width: 100%;
+  max-height: 40rem;
+  margin-inline: auto;
+}
+
+.fb-map-canvas canvas {
+  cursor: crosshair;
+}
+
+.fb-replay {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem 2.5rem;
+  margin-top: 1.5rem;
+}
+
+.fb-replay .slider label {
+  color: var(--field-ink-2);
+}
+
+.fb-readout {
+  min-height: 1.6em;
+  margin-top: 1rem;
+  font-size: var(--step--1);
+  color: var(--field-ink-2);
+}
+
+.fb-readout .id {
+  color: var(--field-ink);
+}
+
+@media (max-width: 860px) {
+  .fb-replay {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .fb-map-count {
+    font-size: var(--step-1);
+  }
+  .fb-map-count small {
+    display: block;
+    margin: 0.15rem 0 0;
+  }
+  .fb-map-head {
+    font-size: var(--step--2);
+  }
+}
+
+/* Brain and nerve cord */
+.fb-panels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2.5rem clamp(1.5rem, 3vw, 3rem);
+}
+
+.fb-slope {
+  max-width: 52rem;
+}
+
+.fb-panel,
+.fb-slope {
+  min-width: 0;
+}
+
+.fb-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.15rem 0.75rem;
+  margin-bottom: 0.5rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--rule);
+  font-size: var(--step--1);
+  color: var(--ink-2);
+}
+
+.fb-panel-head strong {
+  font-family: var(--serif);
+  font-size: var(--step-1);
+  font-weight: 500;
+  font-variation-settings: "opsz" 20;
+  color: var(--ink);
+}
+
+.fb-slope .fb-key {
+  margin-top: 0.75rem;
+}
+
+@media (max-width: 960px) {
+  .fb-panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* How collapse arrives */
+.fb-fits {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 2rem clamp(1.5rem, 4vw, 4rem);
+  align-items: start;
+}
+
+.fb-fits > * {
+  min-width: 0;
+}
+
+.fb-fits .facts {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.fb-fits-title {
+  margin-bottom: 0.6rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.fb-fits-note,
+.fb-table-note {
+  margin-top: 0.75rem;
+}
+
+.fb-verdicts {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--step--1);
+}
+
+.fb-verdicts li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.15rem 1rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--rule);
+  color: var(--ink);
+}
+
+.fb-verdicts li:last-child {
+  border-bottom: 1px solid var(--rule);
+}
+
+.fb-verdicts .fb-stat {
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.fb-strip {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fb-strip li {
+  border-top: 1px solid var(--rule);
+}
+
+.fb-strip li:last-child {
+  border-bottom: 1px solid var(--rule);
+}
+
+.fb-strip button {
+  width: 100%;
+  min-height: 2.75rem;
+  display: grid;
+  grid-template-columns: 13rem minmax(0, 1fr) 12rem;
+  align-items: center;
+  gap: 0.4rem 1.25rem;
+  padding: 0.5rem 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-size: var(--step--1);
+  color: var(--ink);
+  transition: opacity 160ms;
+}
+
+.fb-strip button:focus-visible {
+  outline-offset: 3px;
+}
+
+.fb-strip button.is-dim {
+  opacity: 0.5;
+}
+
+.fb-strip button:hover .fb-name,
+.fb-strip button[aria-pressed="true"] .fb-name {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.fb-strip button[aria-pressed="true"] .fb-name {
+  font-weight: 650;
+}
+
+.fb-track {
+  position: relative;
+  height: 10px;
+  background: var(--wash);
+  border-radius: 1px;
+}
+
+.fb-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 1px;
+}
+
+.fb-mark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ink);
+}
+
+.fb-figures {
+  text-align: right;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.fb-figures strong {
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.fb-strip-axis {
+  display: grid;
+  grid-template-columns: 13rem minmax(0, 1fr) 12rem;
+  gap: 1.25rem;
+  padding-top: 0.3rem;
+}
+
+.fb-ticks {
+  position: relative;
+  height: 1.3rem;
+}
+
+.fb-ticks > span {
+  position: absolute;
+  width: 28px;
+  transform: translateX(-50%);
+}
+
+.fb-ticks svg {
+  max-width: none;
+  overflow: visible;
+}
+
+.fb-strip-tick {
+  font-family: var(--sans);
+  font-size: 11px;
+  fill: var(--ink-3);
+}
+
+.fb-strip-tick .fb-exp {
+  font-size: 8px;
+}
+
+@media (max-width: 860px) {
+  .fb-fits {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .fb-strip button {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .fb-track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .fb-strip-axis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fb-strip-axis > span:not(.fb-ticks) {
+    display: none;
+  }
+  .fb-ticks {
+    margin-inline: 0.5rem;
+  }
+}
+
+/* The shape of the graph */
+.fb-structure {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 0 clamp(1.5rem, 4vw, 3.5rem);
+  align-items: start;
+}
+
+.fb-structure > * {
+  min-width: 0;
+}
+
+.fb-structure > .figure {
+  margin-top: 0;
+}
+
+.fb-favoured {
+  margin: 1.25rem 0 0.75rem;
+  font-family: var(--serif);
+  font-size: var(--step-1);
+  line-height: 1.45;
+  font-variation-settings: "opsz" 18;
+}
+
+@media (max-width: 960px) {
+  .fb-structure {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fb-structure > .figure + .figure {
+    margin-top: 3.5rem;
+  }
+}
+
+.fb-sup {
+  font-size: 0.72em;
+  line-height: 0;
+  vertical-align: 0.5em;
+}

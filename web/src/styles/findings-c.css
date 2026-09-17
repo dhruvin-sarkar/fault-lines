@@ -1,0 +1,527 @@
+/* Pairs, left and right, hidden bottleneck, and the cell type lookup. */
+
+.fc-legend {
+  margin-bottom: 1rem;
+}
+
+.fc-legend svg {
+  flex: none;
+  overflow: visible;
+}
+
+/* Chart text roles */
+.chart .fc-row-label {
+  font-size: 12px;
+  font-weight: 620;
+  font-stretch: 94%;
+  fill: var(--ink);
+}
+
+.chart .fc-row-label.is-off {
+  font-weight: 500;
+  fill: var(--ink-2);
+}
+
+.chart .fc-hit {
+  fill: transparent;
+}
+
+.fc-row:focus-visible .fc-hit {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.field .fc-row:focus-visible .fc-hit {
+  stroke: var(--field-ink);
+}
+
+.chart .fc-row-sub {
+  font-size: 11px;
+  fill: var(--ink-3);
+}
+
+.chart .fc-head {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--ink-2);
+}
+
+.chart .fc-value {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--ink);
+}
+
+.chart .fc-value-quiet {
+  font-size: 11px;
+  fill: var(--ink-3);
+}
+
+.chart .fc-band {
+  fill: var(--wash);
+}
+
+.chart .fc-track {
+  stroke: var(--rule);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.chart .fc-zone {
+  fill: var(--wash);
+}
+
+.chart .fc-criterion {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+.chart .fc-bar {
+  fill: var(--ink-3);
+}
+
+.chart .fc-bar-on {
+  fill: var(--ink);
+}
+
+.chart .fc-ring {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.75;
+}
+
+.chart .fc-dot {
+  fill: var(--ink);
+}
+
+.chart .fc-dot-signal {
+  fill: var(--signal);
+}
+
+.chart .fc-link {
+  fill: none;
+  stroke: var(--ink-2);
+  transition: opacity 120ms;
+}
+
+.fc-glyph-ring {
+  fill: var(--paper);
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.fc-glyph-signal {
+  fill: var(--signal);
+}
+
+.fc-glyph-ink {
+  fill: var(--ink);
+}
+
+.fc-glyph-tick {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.fc-row {
+  outline: none;
+  cursor: pointer;
+}
+
+
+.fc-row-static {
+  cursor: default;
+}
+
+.tooltip .fc-tip {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 12rem;
+  white-space: normal;
+}
+
+.tooltip .fc-tip-sub {
+  color: var(--ink-2);
+}
+
+.field .tooltip .fc-tip-sub {
+  color: var(--field-ink-2);
+}
+
+.fc-more {
+  margin-top: 1rem;
+}
+
+/* Two figures side by side: a paper chart and a field panel. */
+.fc-duo {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 0 clamp(1.5rem, 3.5vw, 3rem);
+  align-items: start;
+}
+
+.fc-duo > * {
+  min-width: 0;
+}
+
+.fc-duo > .figure {
+  margin-top: 0;
+}
+
+.fc-map {
+  position: relative;
+  width: 100%;
+  max-height: 40rem;
+  margin-inline: auto;
+}
+
+.fc-map canvas {
+  cursor: crosshair;
+}
+
+.fc-map-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  margin-top: 1rem;
+  font-size: var(--step--1);
+  color: var(--field-ink-2);
+}
+
+.fc-map-key > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.fc-map-key svg {
+  flex: none;
+  overflow: visible;
+}
+
+.fc-readout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.2rem;
+  margin-top: 1.25rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--field-rule);
+  font-size: var(--step--1);
+  line-height: 1.5;
+  color: var(--field-ink-2);
+}
+
+.fc-readout strong {
+  font-family: var(--serif);
+  font-size: var(--step-2);
+  font-weight: 460;
+  font-stretch: 100%;
+  font-variation-settings: "opsz" 32;
+  line-height: 1.15;
+  color: var(--field-ink);
+  overflow-wrap: anywhere;
+}
+
+.fc-toggle {
+  margin-top: 0.75rem;
+}
+
+/* Bilateral: how single-side losses combine */
+.fc-bars {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.9rem;
+  max-width: 46rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fc-bars li {
+  display: grid;
+  grid-template-columns: minmax(0, 11rem) minmax(0, 1fr) 4.5rem;
+  align-items: center;
+  gap: 0.35rem 1rem;
+  font-size: var(--step--1);
+}
+
+.fc-bars .fc-bar-name {
+  font-weight: 600;
+}
+
+.fc-bars .fc-bar-meaning {
+  display: block;
+  font-weight: 400;
+  color: var(--ink-2);
+}
+
+.fc-bars .fc-bar-track {
+  position: relative;
+  height: 0.75rem;
+  background: linear-gradient(var(--rule), var(--rule)) left center / 100% 1px no-repeat;
+}
+
+.fc-bars .fc-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 1px;
+}
+
+.fc-bars .fc-bar-count {
+  text-align: right;
+  font-family: var(--serif);
+  font-size: var(--step-1);
+  font-variation-settings: "opsz" 20;
+  line-height: 1.1;
+}
+
+.fc-bars .fc-bar-count small {
+  display: block;
+  font-family: var(--sans);
+  font-size: var(--step--2);
+  color: var(--ink-3);
+}
+
+@media (max-width: 560px) {
+  .fc-bars li {
+    grid-template-columns: minmax(0, 1fr) 4.5rem;
+  }
+  .fc-bars .fc-bar-label {
+    grid-column: 1 / -1;
+  }
+}
+
+.fc-tests {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  max-width: 46rem;
+  margin: 0;
+}
+
+.fc-tests > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35rem;
+  padding: 0.9rem 0 1rem;
+  border-top: 1px solid var(--rule);
+}
+
+.fc-tests dt {
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.fc-tests dd {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.fc-tests .fc-verdict {
+  font-family: var(--serif);
+  font-size: var(--step-1);
+  line-height: 1.5;
+  font-variation-settings: "opsz" 14;
+}
+
+.fc-tests .fc-stats {
+  font-size: var(--step--1);
+  color: var(--ink-3);
+}
+
+/* Lookup */
+.fc-lookup {
+  display: grid;
+  grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+  gap: 3rem clamp(1.5rem, 4vw, 4rem);
+  align-items: start;
+}
+
+.fc-lookup > *,
+.fc-lookup-main > *,
+.fc-profile > * {
+  min-width: 0;
+}
+
+.fc-lookup-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2.5rem;
+  align-content: start;
+}
+
+.fc-lookup-map {
+  position: sticky;
+  top: calc(var(--nav-height) + 1.25rem);
+}
+
+.fc-lookup-map .figure {
+  margin-top: 0;
+}
+
+.fc-search {
+  position: relative;
+  max-width: 32rem;
+}
+
+.fc-search .input {
+  font-size: var(--step-0);
+}
+
+.fc-listbox {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  left: 0;
+  max-height: 22rem;
+  margin: 0;
+  padding: 0.3rem;
+  overflow-y: auto;
+  list-style: none;
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  box-shadow: 0 0 0 1px var(--rule), 0 10px 26px rgb(14 18 22 / 0.12);
+}
+
+.fc-listbox [role="option"] {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 4px;
+  font-size: var(--step--1);
+  cursor: pointer;
+}
+
+.fc-listbox [role="option"][aria-selected="true"] {
+  background: var(--wash);
+  box-shadow: inset 2px 0 0 var(--ink);
+}
+
+.fc-listbox .id {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fc-listbox mark {
+  background: none;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.2em;
+}
+
+.fc-option-meta {
+  flex: none;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.fc-listbox .fc-empty {
+  padding: 0.55rem 0.65rem;
+  font-size: var(--step--1);
+  color: var(--ink-3);
+}
+
+.fc-picks {
+  margin-top: 1.25rem;
+}
+
+.fc-picks .label {
+  margin-bottom: 0.5rem;
+}
+
+.fc-picks .choices {
+  display: flex;
+  max-width: 100%;
+}
+
+.fc-picks .choice {
+  min-height: 2.5rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.fc-profile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2rem;
+  padding-top: 1.1rem;
+  border-top: 2px solid var(--ink);
+}
+
+.fc-profile-name {
+  font-family: var(--serif);
+  font-size: var(--step-4);
+  font-weight: 420;
+  font-variation-settings: "opsz" 60;
+  line-height: 1.02;
+  letter-spacing: -0.018em;
+  overflow-wrap: anywhere;
+}
+
+.fc-profile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin-top: 0.7rem;
+  font-size: var(--step--1);
+  color: var(--ink-2);
+}
+
+.fc-profile .facts {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
+  column-gap: 1.25rem;
+}
+
+.fc-profile .facts dd {
+  overflow-wrap: anywhere;
+}
+
+.fc-profile .facts dd.fc-fact-text {
+  font-size: var(--step-2);
+  line-height: 1.1;
+}
+
+.fc-profile-note {
+  max-width: 40rem;
+}
+
+.fc-timing-head {
+  margin-bottom: 0.75rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--ink);
+}
+
+.fc-timing-title {
+  font-family: var(--serif);
+  font-size: var(--step-2);
+  font-weight: 500;
+  font-variation-settings: "opsz" 32;
+  line-height: 1.2;
+}
+
+@media (max-width: 960px) {
+  .fc-duo,
+  .fc-lookup {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fc-duo > .figure + .figure {
+    margin-top: 3.5rem;
+  }
+  .fc-lookup-map {
+    position: static;
+  }
+  .fc-map {
+    max-width: 28rem;
+  }
+}

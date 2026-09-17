@@ -1,0 +1,399 @@
+/* Six attacks: the removal race on the black field */
+.race-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.race-play {
+  min-width: 6.5rem;
+}
+
+.race-focus {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.race-move {
+  transition: transform var(--race-step, 260ms) var(--race-ease, ease);
+}
+
+#collapse .race-instrument > * {
+  min-width: 0;
+}
+
+.race-chart {
+  position: relative;
+  cursor: crosshair;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.race-chart.race-tip-right .tooltip {
+  transform: translate(16px, -50%);
+}
+
+.race-chart.race-tip-left .tooltip {
+  transform: translate(calc(-100% - 16px), -50%);
+}
+
+.race-chart.race-tip-top .tooltip {
+  transform: translate(-50%, 0);
+}
+
+.race-tip-note {
+  margin-top: 0.3rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--field-rule);
+  color: var(--field-ink-3);
+}
+
+.race-chart .race-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  transition: opacity 200ms;
+}
+
+.race-chart .race-line.is-focus {
+  stroke-width: 2.75;
+}
+
+.race-chart .race-band {
+  fill: var(--glow-random);
+  fill-opacity: 0.16;
+}
+
+.race-chart .race-half {
+  stroke: var(--field-ink-3);
+  stroke-dasharray: 3 4;
+}
+
+.race-chart .race-half-label {
+  fill: var(--field-ink-2);
+}
+
+.race-chart .race-playhead {
+  stroke: var(--field-ink);
+  stroke-opacity: 0.55;
+}
+
+.race-chart .race-dot {
+  stroke: var(--field);
+  stroke-width: 1.5;
+}
+
+.race-chart .race-hover-line {
+  stroke: var(--field-ink-2);
+  stroke-dasharray: 2 3;
+}
+
+.race-chart .race-halving {
+  fill: var(--field);
+  stroke-width: 2;
+}
+
+.race-chart .race-ring {
+  fill: none;
+  stroke-width: 1.5;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: race-ring 900ms var(--ease);
+}
+
+.race-chart .race-ci-bar {
+  stroke-width: 6;
+  stroke-opacity: 0.4;
+  stroke-linecap: round;
+}
+
+@keyframes race-ring {
+  from {
+    transform: scale(0.8);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+
+.race-chart .direct-label.is-focus {
+  font-weight: 700;
+}
+
+.race-chart .is-dim {
+  opacity: 0.18;
+}
+
+.race-legend {
+  margin-top: 0.5rem;
+  color: var(--field-ink-2);
+}
+
+.race-scrub {
+  margin-top: 0.75rem;
+}
+
+.race-chart-caption {
+  margin-top: 1rem;
+  color: var(--field-ink-2);
+}
+
+.race-scrub .slider label {
+  color: var(--field-ink-2);
+}
+
+.race-scrub .slider output {
+  font-family: var(--serif);
+  font-size: var(--step-1);
+  font-weight: 460;
+  white-space: nowrap;
+}
+
+.race-side {
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+}
+
+.race-board li {
+  border-top-color: var(--field-rule);
+  transition: transform 360ms var(--ease), opacity 200ms;
+}
+
+.race-board li.is-dim {
+  opacity: 0.35;
+}
+
+.race-board-name {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.race-board-label {
+  font-size: var(--step--1);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--field-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.race-meter {
+  display: block;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--field-rule);
+  overflow: hidden;
+}
+
+.race-meter span {
+  display: block;
+  height: 100%;
+  transform-origin: left center;
+  transition: transform var(--race-step, 260ms) var(--race-ease, ease);
+}
+
+.race-board .meta {
+  line-height: 1.2;
+  color: var(--field-ink-3);
+}
+
+.race-board .meta.is-halved {
+  animation: race-halved 1600ms var(--ease);
+}
+
+@keyframes race-halved {
+  from {
+    color: var(--signal-glow);
+  }
+  to {
+    color: var(--field-ink-3);
+  }
+}
+
+.race-board .value {
+  min-width: 4.4ch;
+  text-align: right;
+  color: var(--field-ink);
+}
+
+.race-commentary {
+  min-height: 3.2em;
+}
+
+.race-multiples-head {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--field-rule);
+}
+
+.race-map-legend {
+  color: var(--field-ink-2);
+}
+
+.race-key {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: none;
+}
+
+.race-key-live {
+  background: var(--field-live);
+}
+
+.race-key-fresh {
+  background: var(--signal-glow);
+}
+
+.race-key-silent {
+  background: var(--field-ink-2);
+}
+
+.race-multiples {
+  margin-top: 1rem;
+  padding: 0;
+  gap: 0.75rem;
+}
+
+.race-multiples .multiple {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  transition: opacity 200ms;
+}
+
+.race-multiples .multiple.is-dim {
+  opacity: 0.35;
+}
+
+.race-multiples .label {
+  min-height: 2.8em;
+  align-items: flex-start;
+}
+
+.race-multiple-name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  color: var(--field-ink);
+  font-weight: 600;
+}
+
+.race-multiples .canvas-box {
+  position: relative;
+  margin-block: 0.25rem 0.5rem;
+  overflow: hidden;
+}
+
+.race-multiples .canvas-box > div {
+  position: absolute !important;
+  inset: 0;
+}
+
+.race-counts {
+  display: grid;
+  margin-top: auto;
+  font-size: var(--step--2);
+  line-height: 1.45;
+  color: var(--field-ink-3);
+}
+
+.race-counts .number {
+  font-size: var(--step-0);
+  color: var(--field-ink);
+}
+
+.race-more {
+  margin-top: 1.5rem;
+}
+
+.race-table-name {
+  white-space: nowrap;
+}
+
+.race-table-name .swatch {
+  display: inline-block;
+  margin-right: 0.5rem;
+}
+
+.race-ci {
+  color: var(--ink-2);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  #collapse .race-instrument {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .race-board {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 1.25rem;
+  }
+  .race-board li {
+    min-height: 4rem;
+  }
+  .race-board-label {
+    white-space: normal;
+  }
+  .race-commentary {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .race-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .race-focus .segmented {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+  .race-focus .segmented button {
+    white-space: normal;
+    text-align: left;
+    line-height: 1.2;
+  }
+  .race-board {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .race-board li {
+    min-height: 3.5rem;
+  }
+  .race-board .value {
+    font-size: var(--step-2);
+  }
+  .race-multiples {
+    gap: 0.75rem 0.5rem;
+  }
+  .race-ci {
+    display: block;
+  }
+  .race-table-name {
+    white-space: normal;
+  }
+  .race-scrub .slider {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .race-scrub .slider label {
+    grid-column: 1 / -1;
+    margin-bottom: -0.5rem;
+  }
+}

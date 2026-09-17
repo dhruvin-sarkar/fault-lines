@@ -1,0 +1,160 @@
+import { XAxis, YAxis } from "../Chart.jsx";
+import { logTicks } from "../../lib/scales.js";
+
+const CHAR = 6.7;
+
+/** A label in sentence case, for axis titles, row labels and keys. */
+export const sentence = (text) => (text ? `${text[0].toUpperCase()}${text.slice(1)}` : text);
+
+/** Strategy colour for marks on paper. */
+export const inkColor = (id) => `var(--s-${id}-ink)`;
+
+/** A power of ten set as 10 with a raised exponent. */
+export function Pow({ value }) {
+  const e = Math.round(Math.log10(value));
+  return (
+    <>
+      10
+      <tspan className="fb-exp" dy="-0.55em">
+        {e < 0 ? `−${-e}` : e}
+      </tspan>
+    </>
+  );
+}
+
+const powLabel = (v) => <Pow value={v} />;
+
+/** Intermediate ticks (2 to 9 times each power of ten) inside a positive domain. */
+export function minorTicks([d0, d1]) {
+  const out = [];
+  for (let e = Math.floor(Math.log10(d0)); e <= Math.ceil(Math.log10(d1)); e += 1) {
+    for (let m = 2; m <= 9; m += 1) {
+      const v = m * 10 ** e;
+      if (v > d0 * 1.0001 && v < d1 * 0.9999) out.push(v);
+    }
+  }
+  return out;
+}
+
+/**
+ * Log-log axes: gridlines and 10^k labels at each power of ten, short minor ticks between them.
+ * `xs` and `ys` are log scales with a `domain`; labels thin out when the plot is too narrow for every decade.
+ */
+export function LogAxes({ xs, ys, width, height, xTitle, yTitle }) {
+  const xMajor = logTicks(xs.domain);
+  const yMajor = logTicks(ys.domain);
+  const room = width / Math.max(1, xMajor.length - 1);
+  const every = room < 30 ? 2 : 1;
+  const xLabels = xMajor.filter((_, i) => i % every === 0 || i === xMajor.length - 1);
+  return (
+    <g>
+      {xMajor.map((t) => (
+        <line key={t} className="fb-grid" x1={xs(t)} x2={xs(t)} y1={0} y2={height} />
+      ))}
+      <YAxis scale={ys} ticks={yMajor} width={width} format={powLabel} title={yTitle} />
+      <XAxis scale={xs} ticks={xLabels} height={height} width={width} format={powLabel} title={xTitle} />
+      {xMajor.map((t) => (
+        <line key={t} className="fb-tick" x1={xs(t)} x2={xs(t)} y1={height} y2={height + 6} />
+      ))}
+      {minorTicks(xs.domain).map((t) => (
+        <line key={t} className="fb-tick" x1={xs(t)} x2={xs(t)} y1={height} y2={height + 3} />
+      ))}
+      <line className="fb-tick" x1={0} x2={0} y1={0} y2={height} />
+      {yMajor.map((t) => (
+        <line key={t} className="fb-tick" x1={-6} x2={0} y1={ys(t)} y2={ys(t)} />
+      ))}
+      {minorTicks(ys.domain).map((t) => (
+        <line key={t} className="fb-tick" x1={-3} x2={0} y1={ys(t)} y2={ys(t)} />
+      ))}
+    </g>
+  );
+}
+
+/** A label split over two lines at the space nearest its middle, for narrow plots. */
+function lines(label, narrow) {
+  if (!narrow || label.length <= 13 || !label.includes(" ")) return [label];
+  const mid = label.length / 2;
+  let cut = -1;
+  for (let i = 0; i < label.length; i += 1) {
+    if (label[i] === " " && (cut < 0 || Math.abs(i - mid) < Math.abs(cut - mid))) cut = i;
+  }
+  return [label.slice(0, cut), label.slice(cut + 1)];
+}
+
+/** Label positions at least `gap` apart inside [lo, hi], moving each as little as the others allow. */
+export function spread(items, gap, lo, hi) {
+  const sorted = [...items].sort((a, b) => a.y - b.y);
+  sorted.forEach((item) => (item.y = Math.max(lo, Math.min(hi, item.y))));
+  for (let i = 1; i < sorted.length; i += 1) sorted[i].y = Math.max(sorted[i].y, sorted[i - 1].y + gap);
+  const n = sorted.length;
+  if (n && sorted[n - 1].y > hi) {
+    sorted[n - 1].y = hi;
+    for (let i = n - 2; i >= 0; i -= 1) sorted[i].y = Math.min(sorted[i].y, sorted[i + 1].y - gap);
+  }
+  return sorted;
+}
+
+/** Right margin that fits the direct labels of `labels`. */
+export function labelRoom(labels, narrow) {
+  const longest = Math.max(0, ...labels.flatMap((l) => lines(l, narrow).map((s) => s.length)));
+  return Math.ceil(longest * CHAR) + 30;
+}
+
+/**
+ * Labels at the right end of lines, nudged apart and joined to their line by a short leader.
+ * Each item is { id, label, y, stroke, dash }, with `y` the line's last value in pixels.
+ */
+export function LineLabels({ items, width, height, narrow = false, dim }) {
+  const gap = narrow ? 27 : 16;
+  const placed = spread(
+    items.map((item) => ({ ...item, end: item.y })),
+    gap,
+    0,
+    height,
+  );
+  return (
+    <g>
+      {placed.map((item) => {
+        const parts = lines(item.label, narrow);
+        return (
+          <g key={item.id} style={{ opacity: dim?.(item.id) ?? 1 }}>
+            <path className="fb-leader" d={`M${width + 2} ${item.end}L${width + 8} ${item.y}`} />
+            <line
+              x1={width + 8}
+              x2={width + 18}
+              y1={item.y}
+              y2={item.y}
+              style={{ stroke: item.stroke, strokeWidth: 2, strokeDasharray: item.dash }}
+            />
+            <text className="direct-label" x={width + 22} y={item.y - ((parts.length - 1) * 13) / 2}>
+              {parts.map((part, i) => (
+                <tspan key={part} x={width + 22} dy={i ? 13 : "0.32em"}>
+                  {part}
+                </tspan>
+              ))}
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+/** Ticks for a removal-fraction axis that runs to about one half. */
+export function xTicks(max, narrow) {
+  const step = narrow ? 0.25 : 0.1;
+  return Array.from({ length: Math.floor(max / step + 1e-9) + 1 }, (_, i) => Number((i * step).toFixed(2)));
+}
+
+/** "p = value" with very small values as a power of ten; a p that underflowed to zero reads as below 0.001. */
+export function PValue({ p }) {
+  if (p == null) return "p not available";
+  if (p === 0) return "p < 0.001";
+  if (p >= 0.001) return `p = ${p < 0.01 ? p.toFixed(3) : p.toFixed(2)}`;
+  const [mantissa, exponent] = p.toExponential(1).split("e");
+  return (
+    <>
+      p = {mantissa} × 10<sup className="fb-sup">{`−${Math.abs(Number(exponent))}`}</sup>
+    </>
+  );
+}

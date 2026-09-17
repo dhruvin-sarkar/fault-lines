@@ -1,0 +1,95 @@
+/* Findings opening: title, the answer in one paragraph, and the key results that lead into each chapter. */
+
+.fi-title {
+  max-width: 18ch;
+}
+
+.fi-lede {
+  max-width: var(--measure);
+}
+
+.fi-lede strong {
+  color: var(--ink);
+}
+
+.fi-keys {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 30rem), 1fr));
+  gap: 0 clamp(2rem, 4vw, 4rem);
+  margin-top: 3.5rem;
+  border-top: 1px solid var(--ink);
+}
+
+.fi-keys li {
+  border-top: 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.fi-keys a {
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: 0.25rem 1.25rem;
+  align-items: first baseline;
+  padding: 1.05rem 0 1.2rem;
+}
+
+.fi-keys .key-value {
+  font-size: var(--step-3);
+  font-weight: 420;
+  font-variation-settings: "opsz" 48;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.fi-key-text {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.fi-keys .key-title {
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+
+.fi-key-note {
+  font-family: var(--sans);
+  font-size: var(--step--1);
+  line-height: 1.5;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.fi-keys a:focus-visible {
+  outline-offset: 4px;
+}
+
+/* Part headings sit quietly above the chapters they gather. */
+.fi-part {
+  margin-top: var(--section);
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule-strong);
+  max-width: none;
+  font-family: var(--serif);
+  font-size: var(--step-2);
+  font-style: italic;
+  font-weight: 400;
+  font-variation-settings: "opsz" 28;
+  line-height: 1.25;
+  letter-spacing: 0;
+  color: var(--ink-2);
+  text-wrap: balance;
+}
+
+.fi-part + .finding {
+  padding-top: clamp(1.75rem, 1.25rem + 1.5vw, 2.5rem);
+}
+
+@media (max-width: 560px) {
+  .fi-keys a {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.4rem;
+  }
+
+  .fi-keys .key-value {
+    font-size: var(--step-2);
+  }
+}

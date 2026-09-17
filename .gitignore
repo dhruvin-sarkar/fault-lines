@@ -26,6 +26,7 @@ web/dist/
 web/.vite/
 
 # OS / editor
+.kilo/
 .DS_Store
 Thumbs.db
 .vscode/

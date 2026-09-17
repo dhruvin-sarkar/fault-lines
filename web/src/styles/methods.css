@@ -1,0 +1,185 @@
+/* Methods: a paper appendix. Serif prose with sans margin notes, ruled tables, one command block. */
+.mt-head {
+  padding-bottom: 2.5rem;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--ink);
+}
+
+.mt-part {
+  padding-top: 3.5rem;
+}
+
+.mt-heading {
+  max-width: var(--measure);
+  margin-bottom: 1.25rem;
+  font-family: var(--serif);
+  font-size: var(--step-3);
+  font-weight: 450;
+  font-variation-settings: "opsz" 48;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.mt-list {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.mt-list li + li {
+  margin-top: 0.6rem;
+}
+
+.mt-list li::marker {
+  color: var(--ink-3);
+}
+
+/* Tables */
+.mt-table {
+  max-width: var(--measure);
+  margin-top: 2.5rem;
+  font-family: var(--sans);
+}
+
+.mt-table-caption {
+  caption-side: top;
+  max-width: 46rem;
+  padding-bottom: 0.9rem;
+  text-align: left;
+  font-size: var(--step--1);
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.mt-table-number {
+  display: block;
+  margin-bottom: 0.2rem;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.mt-table-title {
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.mt-table table.data {
+  border-top: 1.5px solid var(--ink);
+  border-bottom: 1.5px solid var(--ink);
+}
+
+/* Scrollable regions take keyboard focus so their overflow can be reached without a pointer. */
+.mt-scroll:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.mt-table table.data th,
+.mt-table table.data td {
+  padding: 0.5rem 0.75rem;
+  line-height: 1.45;
+}
+
+.mt-table table.data th:first-child,
+.mt-table table.data td:first-child {
+  padding-left: 0;
+}
+
+.mt-table table.data th:last-child,
+.mt-table table.data td:last-child {
+  padding-right: 0;
+}
+
+.mt-table table.data thead th {
+  color: var(--ink);
+  border-bottom: 1px solid var(--ink);
+}
+
+.mt-table table.data tbody th {
+  min-width: 9rem;
+  font-weight: 500;
+  color: var(--ink);
+  vertical-align: top;
+  border-bottom: 1px solid var(--rule);
+}
+
+.mt-table table.data tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.mt-table table.data td {
+  color: var(--ink-2);
+}
+
+.mt-table table.data td.num {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* Commands */
+.mt-code {
+  min-width: 0;
+  max-width: min(100%, var(--measure));
+  margin-top: 2rem;
+}
+
+.mt-code pre.cmd {
+  white-space: pre;
+}
+
+/* Footer */
+.mf .mf-links {
+  display: grid;
+  gap: 0;
+  margin: -0.55rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Visually compact, but each link keeps a tap target of at least 40px. */
+.mf-links a {
+  display: inline-block;
+  min-height: 2.5rem;
+  padding-block: 0.55rem;
+  line-height: 1.4rem;
+}
+
+.mf-aside {
+  display: block;
+  margin-top: -0.45rem;
+  padding-bottom: 0.4rem;
+  color: var(--ink-3);
+}
+
+.mf p {
+  max-width: 34rem;
+}
+
+.mf-gap {
+  margin-top: 0.6rem;
+}
+
+.mf-nowrap {
+  white-space: nowrap;
+}
+
+.mf .mf-note {
+  max-width: none;
+  margin-top: 2.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--rule);
+  color: var(--ink-3);
+}
+
+@media (max-width: 720px) {
+  .mt-part {
+    padding-top: 2.75rem;
+  }
+
+  .mt-heading {
+    font-size: var(--step-2);
+  }
+
+  .mt-table table.data tbody th {
+    min-width: 7rem;
+  }
+}

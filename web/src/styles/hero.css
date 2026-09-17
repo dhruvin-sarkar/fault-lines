@@ -1,0 +1,158 @@
+/* Hero: the title plate beside the atlas at the point where sensory-to-motor routes halve. */
+.hero-frame {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "copy atlas"
+    "copy toggle"
+    "copy caption";
+  column-gap: clamp(2rem, 5vw, 5.5rem);
+  height: max(36rem, calc(100svh - var(--nav-height)));
+  padding-block: clamp(1.5rem, 4svh, 3rem);
+}
+
+.hero-plate-copy {
+  grid-area: copy;
+  align-self: center;
+  max-width: 34rem;
+  padding-bottom: 2rem;
+}
+
+.hero .hero-title {
+  font-size: min(var(--step-hero), 15svh);
+  font-variation-settings: "opsz" 72;
+  line-height: 0.88;
+}
+
+.hero .hero-deck {
+  max-width: 31ch;
+  margin-top: clamp(1.25rem, 3svh, 2rem);
+}
+
+.hero .hero-answer {
+  margin-top: 1.5rem;
+}
+
+.hero-answer i {
+  font-style: italic;
+}
+
+.hero-random {
+  font-weight: 620;
+  color: var(--field-ink);
+}
+
+.hero-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 2rem;
+  margin-top: clamp(1.25rem, 3svh, 2rem);
+}
+
+.hero-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  font-family: var(--sans);
+  font-size: var(--step-0);
+  color: var(--field-ink);
+  text-decoration-color: var(--field-rule);
+  text-underline-offset: 0.3em;
+}
+
+.hero-links a:hover {
+  text-decoration-color: var(--field-ink);
+}
+
+.hero-atlas {
+  grid-area: atlas;
+  position: relative;
+  min-height: 0;
+}
+
+.hero-layer {
+  position: absolute;
+  inset: 0;
+  transition: opacity 360ms var(--ease);
+}
+
+.hero-layer[aria-hidden="true"] {
+  opacity: 0;
+}
+
+.hero-toggle {
+  grid-area: toggle;
+  justify-self: center;
+  padding-top: 1.25rem;
+}
+
+.hero-caption {
+  grid-area: caption;
+  display: grid;
+  justify-self: center;
+  margin-top: 0.75rem;
+  font-family: var(--sans);
+  font-size: var(--step--1);
+  line-height: 1.5;
+  text-align: center;
+  text-wrap: balance;
+  color: var(--field-ink-3);
+}
+
+.hero-caption > span {
+  grid-area: 1 / 1;
+}
+
+.hero-caption .is-hidden {
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-layer {
+    transition: none;
+  }
+}
+
+/* Narrow screens: title and question, the map and its switch, then the answer, links and caption. */
+@media (max-width: 960px) {
+  .hero-frame {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    padding-block: 2.25rem 3rem;
+  }
+  .hero-plate-copy {
+    display: contents;
+  }
+  .hero-title {
+    order: 1;
+  }
+  .hero .hero-deck {
+    order: 2;
+    max-width: 30ch;
+  }
+  .hero-atlas {
+    order: 3;
+    aspect-ratio: 1 / 1;
+    margin: 1.75rem calc(-1 * var(--gutter)) 0;
+  }
+  .hero-toggle {
+    order: 4;
+    align-self: center;
+    padding-top: 1rem;
+  }
+  .hero .hero-answer {
+    order: 5;
+    margin-top: 2rem;
+  }
+  .hero-links {
+    order: 6;
+  }
+  .hero-caption {
+    order: 7;
+    align-self: start;
+    margin-top: 1.5rem;
+    text-align: left;
+  }
+}

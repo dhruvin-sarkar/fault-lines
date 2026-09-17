@@ -1,0 +1,489 @@
+/* How fragility is measured: the toy network on the field, the six attacks, and the curve summary. */
+.ms-part {
+  margin-top: clamp(4rem, 3rem + 3vw, 6rem);
+}
+
+.ms-subhead {
+  max-width: 32ch;
+  margin-bottom: 1.5rem;
+  font-size: var(--step-3);
+  font-weight: 440;
+  line-height: 1.1;
+  letter-spacing: -0.012em;
+  font-variation-settings: "opsz" 48;
+}
+
+.ms sub {
+  line-height: 0;
+}
+
+/* Toy network */
+.ms-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ms-toy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 15.5rem;
+  gap: clamp(1.25rem, 3vw, 2.5rem);
+  align-items: start;
+}
+
+.ms-toy-graph {
+  min-width: 0;
+}
+
+.ms-svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.figure .ms-svg .ms-layer-labels text {
+  font-size: var(--step--2);
+  font-weight: 500;
+  fill: var(--field-ink-3);
+}
+
+.ms-edge {
+  stroke: var(--field-rule);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+
+.ms-edge.is-gone {
+  stroke: var(--field-grid);
+  stroke-dasharray: 2 4;
+}
+
+.ms-edge.is-route {
+  stroke: var(--field-ink);
+  stroke-width: 2;
+}
+
+.ms-routes {
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--field-ink) 55%, transparent));
+}
+
+.ms-cut line {
+  stroke: var(--signal-glow);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.ms-cut {
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--signal-glow) 70%, transparent));
+}
+
+.ms-node {
+  cursor: pointer;
+  outline: none;
+}
+
+.ms-hit {
+  fill: transparent;
+}
+
+.ms-dot {
+  fill: var(--field-live);
+  stroke: var(--field);
+  stroke-width: 2;
+}
+
+.ms-node.is-idle .ms-dot {
+  fill: var(--field-ghost);
+  stroke: var(--field-ink-3);
+  stroke-width: 1.25;
+}
+
+.ms-node.is-removed .ms-dot {
+  fill: var(--field);
+  stroke: var(--signal-glow);
+  stroke-width: 1.5;
+}
+
+.ms-cross {
+  stroke: var(--signal-glow);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.ms-ring {
+  fill: none;
+  stroke: var(--field-ink);
+  stroke-width: 1.5;
+  opacity: 0;
+}
+
+.ms-node:hover .ms-ring {
+  opacity: 0.45;
+}
+
+.ms-node:focus-visible .ms-ring {
+  opacity: 1;
+  stroke-width: 2;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ms-edge {
+    transition: stroke 200ms, opacity 200ms;
+  }
+  .ms-dot {
+    transition: fill 200ms, stroke 200ms;
+  }
+  .ms-ring {
+    transition: opacity 120ms;
+  }
+  .ms-meter span {
+    transition: transform 260ms var(--ease), background-color 200ms;
+  }
+  .ms-value .display {
+    transition: color 200ms;
+  }
+}
+
+.ms-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.25rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--step--1);
+  color: var(--field-ink-2);
+}
+
+.ms-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.ms-legend svg {
+  width: 24px;
+  height: 12px;
+  flex: none;
+  overflow: visible;
+}
+
+.ms-legend svg[viewBox="0 0 12 12"] {
+  width: 12px;
+}
+
+.ms-key-route {
+  stroke: var(--field-ink);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--field-ink) 60%, transparent));
+}
+
+.ms-key-edge {
+  stroke: var(--field-ink-3);
+  stroke-width: 1;
+}
+
+.ms-key-cut {
+  stroke: var(--signal-glow);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.ms-key-idle {
+  fill: var(--field-ghost);
+  stroke: var(--field-ink-3);
+  stroke-width: 1;
+}
+
+.ms-key-removed {
+  fill: none;
+  stroke: var(--signal-glow);
+  stroke-width: 1.4;
+}
+
+/* Readout */
+.ms-readout {
+  display: grid;
+  gap: 1.25rem;
+  padding-top: 0.25rem;
+}
+
+.ms-stat {
+  display: grid;
+  gap: 0.3rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--field-rule);
+}
+
+.ms-stat.is-main {
+  border-top-color: var(--field-ink-3);
+}
+
+.figure .ms-stat .label {
+  color: var(--field-ink-2);
+}
+
+.ms-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.6rem;
+}
+
+.ms-value .display {
+  font-size: clamp(3.5rem, 2.8rem + 2.4vw, 4.75rem);
+  color: var(--field-ink);
+}
+
+.ms-value .display.is-low {
+  color: var(--signal-glow);
+}
+
+.ms-value .number {
+  font-size: var(--step-3);
+  line-height: 1;
+  color: var(--field-ink);
+}
+
+.ms-of {
+  font-size: var(--step--1);
+  color: var(--field-ink-3);
+  white-space: nowrap;
+}
+
+.ms-stat-note {
+  font-size: var(--step--1);
+  line-height: 1.4;
+  color: var(--field-ink-3);
+}
+
+.ms-meter {
+  position: relative;
+  height: 3px;
+  margin: 0.35rem 0 0.2rem;
+  border-radius: 2px;
+  background: var(--field-rule);
+}
+
+.ms-meter span {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  background: var(--field-ink);
+  transform-origin: left center;
+}
+
+.ms-meter span.is-low {
+  background: var(--signal-glow);
+}
+
+/* The half mark on the meter. */
+.ms-meter i {
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  width: 1px;
+  height: 11px;
+  background: var(--field-ink-2);
+}
+
+.ms-removed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--field-rule);
+}
+
+.figure .ms-removed .label {
+  color: var(--field-ink-2);
+}
+
+.ms-reset {
+  min-width: 5rem;
+}
+
+.ms-note {
+  min-height: 4.5em;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--field-rule);
+  font-size: var(--step--1);
+  line-height: 1.5;
+  color: var(--field-ink-2);
+}
+
+/* Strategies */
+.ms-strategies {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 clamp(1.5rem, 3vw, 3rem);
+  margin: 2.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ms-strategies li {
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+  padding: 0.9rem 0 1.75rem;
+  border-top: 1px solid var(--rule-strong);
+}
+
+.ms-strategy-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--serif);
+  font-size: var(--step-1);
+  font-weight: 520;
+  font-variation-settings: "opsz" 20;
+  line-height: 1.25;
+}
+
+.ms-strategy-name .swatch {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.ms-strategies p {
+  font-size: var(--step--1);
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+/* Summary chart */
+.ms-summary {
+  min-width: 0;
+}
+
+.ms-area {
+  opacity: 0.14;
+}
+
+.ms-area.is-target {
+  opacity: 0.26;
+}
+
+.ms-curve {
+  fill: none;
+  stroke-width: 2.25;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.ms-half {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  shape-rendering: crispEdges;
+}
+
+.chart text.ms-half-label {
+  font-size: 11px;
+  fill: var(--ink-2);
+}
+
+.ms-fc line {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+  stroke-dasharray: 1 3;
+}
+
+.ms-fc circle {
+  stroke: var(--paper);
+  stroke-width: 2;
+}
+
+.chart .ms-fc text {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--ink);
+  paint-order: stroke;
+  stroke: var(--paper);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.chart .ms-fc .ms-fc-symbol {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 13px;
+}
+
+.chart .ms-fc .ms-fc-sub {
+  font-size: 9px;
+}
+
+.chart text.ms-curve-label {
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--ink);
+  paint-order: stroke;
+  stroke: var(--paper);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.chart text.ms-curve-label .ms-curve-sub {
+  font-weight: 500;
+  fill: var(--ink-2);
+}
+
+@media (max-width: 1100px) {
+  .ms-strategies {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .ms-toy {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ms-readout {
+    order: -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem 1.5rem;
+  }
+  .ms-removed {
+    grid-column: 1 / -1;
+  }
+  .ms-value .display {
+    font-size: var(--step-4);
+  }
+  .ms-stat.is-main .ms-stat-note,
+  .ms-stat .ms-stat-note {
+    display: none;
+  }
+  .ms-note {
+    grid-column: 1 / -1;
+    min-height: 3em;
+    padding-top: 0;
+    border-top: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .ms-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ms-actions .btn {
+    padding-inline: 0.5rem;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.25;
+  }
+  .ms-strategies {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .ms-value {
+    column-gap: 0.4rem;
+  }
+}

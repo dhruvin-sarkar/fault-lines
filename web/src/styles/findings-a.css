@@ -1,0 +1,400 @@
+/* Thresholds, null model, literature, regions and superclass figures. */
+
+.fa-legend {
+  margin-bottom: 1rem;
+}
+
+.fa-legend svg {
+  flex: none;
+  overflow: visible;
+}
+
+.fa-glyph-fill {
+  fill: var(--ink-2);
+}
+
+.fa-glyph-ink {
+  fill: var(--ink);
+}
+
+.fa-glyph-ring {
+  fill: var(--paper);
+  stroke: var(--ink-2);
+  stroke-width: 1.5;
+}
+
+.fa-glyph-line {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.fa-glyph-dash {
+  stroke: var(--rule-strong);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+.fa-diamond {
+  fill: var(--paper);
+  stroke-width: 1.75;
+  stroke-linejoin: round;
+}
+
+.fa-swatch {
+  flex: none;
+  overflow: visible;
+}
+
+/* Tooltip content */
+.tooltip .fa-tip {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 12rem;
+  white-space: normal;
+}
+
+.tooltip .fa-tip-sub {
+  display: block;
+  color: var(--ink-2);
+  white-space: normal;
+}
+
+.field .tooltip .fa-tip-sub {
+  color: var(--field-ink-2);
+}
+
+.tooltip .row + .fa-tip-sub {
+  margin-top: 0.3rem;
+}
+
+/* Chart text roles */
+.chart .fa-row-label {
+  font-size: 12px;
+  font-weight: 500;
+  fill: var(--ink);
+}
+
+.chart .fa-row-sub {
+  font-size: 11px;
+  fill: var(--ink-3);
+}
+
+.chart .fa-group-title {
+  font-size: 12px;
+  font-weight: 650;
+  fill: var(--ink);
+}
+
+.chart .fa-value {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--ink-2);
+}
+
+.chart .fa-type {
+  font-size: 12px;
+  font-weight: 620;
+  font-stretch: 94%;
+  fill: var(--ink);
+}
+
+.chart .fa-type-name {
+  font-size: 12px;
+  font-weight: 400;
+  font-stretch: 100%;
+  fill: var(--ink-3);
+}
+
+.chart .fa-real-label {
+  font-size: 12px;
+  font-weight: 650;
+  fill: var(--ink);
+}
+
+.chart .fa-band {
+  fill: transparent;
+}
+
+.chart .fa-band.is-on {
+  fill: var(--wash);
+}
+
+.fa-focusable:focus-visible .fa-band {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.chart .fa-track {
+  stroke: var(--rule);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.chart .fa-guide {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+.chart .fa-ref {
+  stroke: var(--rule-strong);
+  stroke-width: 1.25;
+  stroke-dasharray: 4 4;
+}
+
+.chart .fa-leader {
+  stroke: var(--rule-strong);
+  stroke-width: 1;
+  fill: none;
+}
+
+.chart .fa-real {
+  stroke: var(--ink);
+  stroke-width: 2;
+}
+
+.chart .fa-ring {
+  fill: var(--paper);
+  stroke-width: 1.75;
+}
+
+.chart .fa-axis-tick {
+  stroke: var(--rule-strong);
+  shape-rendering: crispEdges;
+}
+
+/* On the black field */
+.field .chart .fa-row-label,
+.field .chart .fa-type {
+  fill: var(--field-ink);
+}
+
+.field .chart .fa-row-sub,
+.field .chart .fa-value {
+  fill: var(--field-ink-2);
+}
+
+.field .chart .fa-band.is-on {
+  fill: var(--field-grid);
+}
+
+.field .fa-focusable:focus-visible .fa-band {
+  stroke: var(--field-ink);
+}
+
+.field .chart .fa-track {
+  stroke: var(--field-rule);
+}
+
+.field .chart .tick line {
+  stroke: var(--field-grid);
+}
+
+.fa-focusable {
+  outline: none;
+}
+
+.fa-nulls > *,
+.fa-lit > *,
+.fa-regions > * {
+  min-width: 0;
+}
+
+.fa-move {
+  transition: transform 520ms var(--ease), opacity 160ms;
+}
+
+.fa-still .fa-move {
+  transition: none;
+}
+
+/* Null model */
+.fa-nulls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2.25rem clamp(1.25rem, 3vw, 2.5rem);
+}
+
+.fa-null {
+  min-width: 0;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--rule);
+}
+
+.fa-null-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: var(--step--1);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.fa-null-head > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.fa-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--step--2);
+  font-weight: 500;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.fa-verdict::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+
+.fa-verdict.is-yes {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.fa-verdict.is-yes::before {
+  background: currentColor;
+}
+
+.fa-null-stats {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  justify-content: start;
+  gap: 0.25rem 1.25rem;
+  margin: 0.5rem 0 0;
+  font-size: var(--step--1);
+}
+
+.fa-null-stats div {
+  display: grid;
+}
+
+.fa-null-stats dt {
+  font-size: var(--step--2);
+  color: var(--ink-3);
+}
+
+.fa-null-stats dd {
+  margin: 0;
+  font-weight: 650;
+}
+
+@media (max-width: 1100px) {
+  .fa-nulls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .fa-nulls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Literature */
+.fa-lit {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(14rem, 1fr);
+  gap: 2rem clamp(1.5rem, 4vw, 3.5rem);
+  align-items: start;
+}
+
+.fa-lit .facts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.fa-lit-reading {
+  margin-top: 1.5rem;
+  font-family: var(--serif);
+  font-size: var(--step-1);
+  line-height: 1.55;
+  font-variation-settings: "opsz" 14;
+  font-variant-numeric: lining-nums proportional-nums;
+}
+
+@media (max-width: 860px) {
+  .fa-lit {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Regions */
+.fa-regions {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: 2rem clamp(1.5rem, 3vw, 2.5rem);
+  align-items: start;
+}
+
+.fa-map {
+  position: relative;
+  width: 100%;
+  max-height: 46rem;
+  margin-inline: auto;
+}
+
+.fa-map canvas {
+  cursor: crosshair;
+}
+
+.fa-map-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem 1.5rem;
+  margin-top: 1rem;
+  font-size: var(--step--1);
+  color: var(--field-ink-2);
+}
+
+.fa-ramp {
+  display: grid;
+  grid-template-columns: auto minmax(5rem, 11rem) auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fa-ramp-bar {
+  height: 0.5rem;
+  border-radius: 1px;
+}
+
+.fa-unscored {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.fa-unscored .swatch {
+  background: #0b0f12;
+  box-shadow: 0 0 0 1px var(--field-rule);
+}
+
+.fa-bars-title {
+  margin-bottom: 0.5rem;
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--field-ink);
+}
+
+.field .legend {
+  color: var(--field-ink-2);
+}
+
+@media (max-width: 860px) {
+  .fa-regions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .fa-map {
+    max-width: 30rem;
+  }
+}
