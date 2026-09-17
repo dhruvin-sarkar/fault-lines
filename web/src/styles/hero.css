@@ -1,11 +1,11 @@
-/* Hero: the title plate beside the atlas at the point where sensory-to-motor routes halve. */
+/* Hero: the title plate beside the atlas, with a removal scale that steps the atlas through the fastest attack. */
 .hero-frame {
   display: grid;
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
   grid-template-rows: minmax(0, 1fr) auto auto;
   grid-template-areas:
     "copy atlas"
-    "copy toggle"
+    "copy scrub"
     "copy caption";
   column-gap: clamp(2rem, 5vw, 5.5rem);
   height: max(36rem, calc(100svh - var(--nav-height)));
@@ -71,47 +71,144 @@
   min-height: 0;
 }
 
-.hero-layer {
-  position: absolute;
-  inset: 0;
-  transition: opacity 360ms var(--ease);
-}
-
-.hero-layer[aria-hidden="true"] {
-  opacity: 0;
-}
-
-.hero-toggle {
-  grid-area: toggle;
+/* Removal scale: one range input over a drawn rail, so the halving mark lines up with the thumb. */
+.hero-scrub {
+  --thumb: 0.875rem;
+  grid-area: scrub;
   justify-self: center;
-  padding-top: 1.25rem;
+  width: min(30rem, 100%);
+  padding-top: 1rem;
+}
+
+.hero-scrub-read {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.25rem 1.5rem;
+  font-family: var(--sans);
+  font-size: var(--step--1);
+  line-height: 1.4;
+  color: var(--field-ink-2);
+}
+
+.hero-scrub-value,
+.hero-readout span {
+  font-weight: 600;
+  color: var(--field-ink);
+}
+
+/* Fixed widths keep the text still while the values change under a drag. */
+.hero-scrub-value {
+  display: inline-block;
+  min-width: 5ch;
+}
+
+.hero-readout span {
+  display: inline-block;
+  min-width: 5ch;
+  text-align: right;
+}
+
+.hero-readout .is-halved {
+  color: var(--signal-glow);
+}
+
+.hero-scrub-track {
+  position: relative;
+  height: 2.5rem;
+}
+
+.hero-scrub-rail,
+.hero-scrub-mark {
+  position: absolute;
+  top: 50%;
+  pointer-events: none;
+}
+
+.hero-scrub-rail {
+  left: calc(var(--thumb) / 2);
+  right: calc(var(--thumb) / 2);
+  height: 2px;
+  margin-top: -1px;
+  border-radius: 1px;
+  background: linear-gradient(
+    to right,
+    var(--field-ink-3) calc(var(--at) * 100%),
+    var(--field-rule) calc(var(--at) * 100%)
+  );
+}
+
+.hero-scrub-mark {
+  left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--mark));
+  width: 2px;
+  height: 1.5rem;
+  margin: -0.75rem 0 0 -1px;
+  border-radius: 1px;
+  background: var(--signal-glow);
+}
+
+.hero-scrub-track input[type="range"] {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  background: transparent;
+  border-radius: var(--radius);
+  -webkit-appearance: none;
+  appearance: none;
+  touch-action: pan-y;
+}
+
+.hero-scrub-track input[type="range"]::-webkit-slider-runnable-track {
+  height: 100%;
+  background: transparent;
+}
+
+.hero-scrub-track input[type="range"]::-moz-range-track {
+  height: 100%;
+  background: transparent;
+}
+
+.hero-scrub-track input[type="range"]::-webkit-slider-thumb {
+  width: var(--thumb);
+  height: var(--thumb);
+  margin-top: calc((2.5rem - var(--thumb)) / 2);
+  border: 0;
+  border-radius: 50%;
+  background: var(--field-ink);
+  box-shadow: 0 0 0 2px var(--field);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.hero-scrub-track input[type="range"]::-moz-range-thumb {
+  width: var(--thumb);
+  height: var(--thumb);
+  border: 0;
+  border-radius: 50%;
+  background: var(--field-ink);
+  box-shadow: 0 0 0 2px var(--field);
+}
+
+.hero-scrub-track input[type="range"]:focus-visible {
+  outline: 2px solid var(--field-ink);
+  outline-offset: 0;
 }
 
 .hero-caption {
   grid-area: caption;
-  display: grid;
   justify-self: center;
-  margin-top: 0.75rem;
+  max-width: 36rem;
+  margin-top: 0.25rem;
   font-family: var(--sans);
   font-size: var(--step--1);
   line-height: 1.5;
   text-align: center;
   text-wrap: balance;
   color: var(--field-ink-3);
-}
-
-.hero-caption > span {
-  grid-area: 1 / 1;
-}
-
-.hero-caption .is-hidden {
-  visibility: hidden;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-layer {
-    transition: none;
-  }
 }
 
 /* Narrow screens: title and question, the map and its switch, then the answer, links and caption. */
@@ -137,9 +234,10 @@
     aspect-ratio: 1 / 1;
     margin: 1.75rem calc(-1 * var(--gutter)) 0;
   }
-  .hero-toggle {
+  .hero-scrub {
     order: 4;
-    align-self: center;
+    align-self: stretch;
+    width: 100%;
     padding-top: 1rem;
   }
   .hero .hero-answer {

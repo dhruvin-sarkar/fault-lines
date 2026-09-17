@@ -51,12 +51,23 @@ export default function App() {
 function HeroSkeleton() {
   return (
     <section className="hero" aria-busy="true">
-      <div className="wrap hero-grid">
-        <div className="hero-copy">
+      <div className="wrap hero-frame">
+        <div className="hero-plate-copy">
           <h1 className="hero-title">Fault Lines</h1>
+          <p className="hero-deck">
+            How much of a fly&apos;s nervous system can be lost before its senses no longer reach the neurons that move it?
+          </p>
           <p className="hero-answer">Loading cell types and the removal experiments run on them.</p>
         </div>
-        <div className="hero-figure" />
+        <div className="hero-atlas" />
+        <div className="hero-scrub" aria-hidden="true">
+          <div className="hero-scrub-read">&nbsp;</div>
+          <div className="hero-scrub-track" />
+        </div>
+        <p className="hero-caption">
+          Each point is a cell type, placed where it makes synapses. Red: removed at this step. Dim: cut off from sensory
+          input. The tick marks where flow halves.
+        </p>
       </div>
     </section>
   );

@@ -102,39 +102,60 @@ export default function Atlas({
     return () => observer.disconnect();
   }, []);
 
+  const ink = useMemo(() => palette(colors, tone), [colors, tone]);
+  // Outlines change far less often than point state, so they are drawn once into a layer and copied per redraw.
+  const layer = useRef({ canvas: null, key: null });
+
   useEffect(() => {
     const el = canvas.current;
     if (!el || !size.w || !size.h || !colors.ink) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    el.width = Math.round(size.w * dpr);
-    el.height = Math.round(size.h * dpr);
-    el.style.width = `${size.w}px`;
-    el.style.height = `${size.h}px`;
+    const width = Math.round(size.w * dpr);
+    const height = Math.round(size.h * dpr);
+    if (el.width !== width || el.height !== height) {
+      el.width = width;
+      el.height = height;
+      el.style.width = `${size.w}px`;
+      el.style.height = `${size.h}px`;
+    }
     const ctx = el.getContext("2d");
     const scale = Math.min(size.w / extent.w, size.h / extent.h);
     const ox = (size.w - extent.w * scale) / 2 - extent.x0 * scale;
     const oy = (size.h - extent.h * scale) / 2 - extent.y0 * scale;
     frame.current = { scale, ox, oy };
-    const ink = palette(colors, tone);
     const liveAlpha = pointAlpha ?? (tone === "field" ? 0.42 : 0.7);
 
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, size.w, size.h);
-    ctx.save();
-    ctx.translate(ox, oy);
-    ctx.scale(scale, scale);
-    ctx.lineJoin = "round";
-    for (const region of outlines) {
-      const fill = regionFill?.(region);
-      ctx.fillStyle = fill ?? ink.tissue;
-      ctx.globalAlpha = fill ? 1 : 0.9;
-      ctx.fill(region.path2d, "evenodd");
-      ctx.globalAlpha = 1;
-      ctx.lineWidth = (region.neuropil === activeRegion ? 2.2 : 0.7) / scale;
-      ctx.strokeStyle = region.neuropil === activeRegion ? ink.active : ink.edge;
-      ctx.stroke(region.path2d);
+    const key = [width, height, dpr, ink, outlines, extent, regionFill, activeRegion];
+    const cached = layer.current;
+    if (!cached.canvas || !cached.key || key.some((part, i) => part !== cached.key[i])) {
+      const tissue = cached.canvas ?? document.createElement("canvas");
+      tissue.width = width;
+      tissue.height = height;
+      const tctx = tissue.getContext("2d");
+      tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      tctx.clearRect(0, 0, size.w, size.h);
+      tctx.translate(ox, oy);
+      tctx.scale(scale, scale);
+      tctx.lineJoin = "round";
+      for (const region of outlines) {
+        const fill = regionFill?.(region);
+        tctx.fillStyle = fill ?? ink.tissue;
+        tctx.globalAlpha = fill ? 1 : 0.9;
+        tctx.fill(region.path2d, "evenodd");
+        tctx.globalAlpha = 1;
+        tctx.lineWidth = (region.neuropil === activeRegion ? 2.2 : 0.7) / scale;
+        tctx.strokeStyle = region.neuropil === activeRegion ? ink.active : ink.edge;
+        tctx.stroke(region.path2d);
+      }
+      layer.current = { canvas: tissue, key };
     }
-    ctx.restore();
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(layer.current.canvas, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const r = Math.max(1.1, Math.min(2.6, scale * 2.1));
     const px = (i) => ox + types.x[i] * scale;
@@ -180,7 +201,7 @@ export default function Atlas({
       ctx.fillStyle = mark;
       ctx.fillRect(px(focus) - r, py(focus) - r, r * 2, r * 2);
     }
-  }, [size, colors, outlines, extent, types, batch, removedAt, silencedAt, regionFill, activeRegion, highlight, focus, pointAlpha, ghostAlpha, silentColor, silentAlpha, highlightTone, tone]);
+  }, [size, colors, ink, outlines, extent, types, batch, removedAt, silencedAt, regionFill, activeRegion, highlight, focus, pointAlpha, ghostAlpha, silentColor, silentAlpha, highlightTone, tone]);
 
   function pointer(event) {
     if (!onRegion && !onType) return;
