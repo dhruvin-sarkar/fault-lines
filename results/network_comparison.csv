@@ -5,7 +5,7 @@ network,removal,criterion,value,qualifier,citation,location,group
 "Male CNS cell types, PageRank","targeted, adaptive PageRank",sensory-to-motor flow capacity halved,0.1875,=,this study,results/critical_thresholds.json,this study
 "Male CNS cell types, sensory-motor betweenness","targeted, adaptive sensory-motor betweenness",sensory-to-motor flow capacity halved,0.0961,=,this study,results/critical_thresholds.json,this study
 "Male CNS cell types, random",random,sensory-to-motor flow capacity halved,0.2832,=,this study,results/critical_thresholds.json,this study
-"Internet, autonomous-system level (6,209 nodes)","targeted, by degree",largest cluster fragments,0.0300,≈,Albert 2000,"main text, Internet paragraph","published, targeted"
+"Internet, AS level (6,209 nodes)","targeted, by degree",largest cluster fragments,0.0300,≈,Albert 2000,"main text, Internet paragraph","published, targeted"
 "World Wide Web sample (325,729 pages)","targeted, by out-degree",largest cluster fragments,0.0670,=,Albert 2000,main text and Fig. 3 caption,"published, targeted"
 "Scale-free model (N = 10,000)","targeted, by degree",largest cluster fragments,0.1800,≈,Albert 2000,"main text, fragmentation paragraph","published, targeted"
 "Exponential random model (N = 10,000)","targeted, by degree",largest cluster fragments,0.2800,≈,Albert 2000,"main text, fragmentation paragraph","published, targeted"

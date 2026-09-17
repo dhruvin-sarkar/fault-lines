@@ -34,7 +34,7 @@ REFERENCES = {
 
 # Only values printed in the text of the primary source; figure read-offs are described in prose instead.
 PUBLISHED = [
-    {"network": "Internet, autonomous-system level (6,209 nodes)", "removal": "targeted, by degree",
+    {"network": "Internet, AS level (6,209 nodes)", "removal": "targeted, by degree",
      "criterion": "largest cluster fragments", "value": 0.03, "qualifier": "≈", "citation": "Albert 2000",
      "location": "main text, Internet paragraph"},
     {"network": "World Wide Web sample (325,729 pages)", "removal": "targeted, by out-degree",
@@ -174,7 +174,7 @@ def main() -> None:
         "",
         f"Under the most damaging strategy ({STRATEGY_LABELS[worst]}), sensory-to-motor capacity halves after "
         f"{100 * ours[worst]['f_c']:.1f}% of cell types are removed. That is the range reported for engineered "
-        "hub-dominated networks under degree or load attack (the autonomous-system Internet at about 3%, the Web "
+        "hub-dominated networks under degree or load attack (the AS-level Internet at about 3%, the Web "
         "sample at 6.7%, the power grid losing up to 60% of connectivity at 4%) and well below the roughly 40% "
         f"reported for human functional brain networks. Random removal needs {100 * ours['random']['f_c']:.1f}% of "
         "cell types. Because the criterion, the resolution (cell types rather than neurons or regions), edge direction "

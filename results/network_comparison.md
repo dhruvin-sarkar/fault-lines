@@ -19,7 +19,7 @@ The threshold here is the fraction of cell types removed when the maximum sensor
 
 | network | removal | breakdown criterion | fraction removed | source, location |
 |---|---|---|---|---|
-| Internet, autonomous-system level (6,209 nodes) | targeted, by degree | largest cluster fragments | ≈0.03 | Albert 2000, main text, Internet paragraph |
+| Internet, AS level (6,209 nodes) | targeted, by degree | largest cluster fragments | ≈0.03 | Albert 2000, main text, Internet paragraph |
 | World Wide Web sample (325,729 pages) | targeted, by out-degree | largest cluster fragments | 0.067 | Albert 2000, main text and Fig. 3 caption |
 | Scale-free model (N = 10,000) | targeted, by degree | largest cluster fragments | ≈0.18 | Albert 2000, main text, fragmentation paragraph |
 | Exponential random model (N = 10,000) | targeted, by degree | largest cluster fragments | ≈0.28 | Albert 2000, main text, fragmentation paragraph |
@@ -40,7 +40,7 @@ The threshold here is the fraction of cell types removed when the maximum sensor
 
 ## Reading
 
-Under the most damaging strategy (weighted out-degree), sensory-to-motor capacity halves after 4.1% of cell types are removed. That is the range reported for engineered hub-dominated networks under degree or load attack (the autonomous-system Internet at about 3%, the Web sample at 6.7%, the power grid losing up to 60% of connectivity at 4%) and well below the roughly 40% reported for human functional brain networks. Random removal needs 28.3% of cell types. Because the criterion, the resolution (cell types rather than neurons or regions), edge direction and recalculation all differ, the comparison supports only a qualitative statement: sensory-to-motor routing in this connectome is concentrated enough that targeted removal of a few percent of cell types halves it.
+Under the most damaging strategy (weighted out-degree), sensory-to-motor capacity halves after 4.1% of cell types are removed. That is the range reported for engineered hub-dominated networks under degree or load attack (the AS-level Internet at about 3%, the Web sample at 6.7%, the power grid losing up to 60% of connectivity at 4%) and well below the roughly 40% reported for human functional brain networks. Random removal needs 28.3% of cell types. Because the criterion, the resolution (cell types rather than neurons or regions), edge direction and recalculation all differ, the comparison supports only a qualitative statement: sensory-to-motor routing in this connectome is concentrated enough that targeted removal of a few percent of cell types halves it.
 
 ## References
 
