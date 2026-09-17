@@ -2,8 +2,8 @@
 
 import pandas as pd
 
-from pipeline.hidden_bottleneck import HIGH_PERCENTILE, LOW_PERCENTILE, TOP_PARTNERS
-from verify.common import close, first_difference, result_csv, result_json, result_text, run
+from pipeline.hidden_bottleneck import HIGH_PERCENTILE, LOW_PERCENTILE, TOP_PARTNERS, report_lines
+from verify.common import close, first_difference, result_csv, result_json, result_text, run, same_text
 
 REL = 1e-5
 
@@ -60,6 +60,8 @@ def check() -> str:
         "hidden_bottleneck.md names a different candidate count or case"
     assert f"| flow capacity, intact → without it | {ex['intact_flow']} → {ex['flow_after_removal']} |" in text, \
         "hidden_bottleneck.md shows different flow numbers"
+    assert same_text(text, "\n".join(report_lines(candidates, ex, n))), \
+        "hidden_bottleneck.md is out of date with hidden_bottleneck.json"
     return (f"{len(candidates)} candidates meet the criteria; {ex['cell_type']} carries "
             f"{100 * ex['share_of_shortest_routes']:.2f}% of shortest routes, costs {single['flow_drop']} of flow, "
             "agrees with single removal")

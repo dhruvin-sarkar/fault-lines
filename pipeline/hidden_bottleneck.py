@@ -1,5 +1,6 @@
 """Find cell types that look unimportant by connection count but carry a large share of sensory-to-motor routes."""
 
+import argparse
 import json
 import sys
 
@@ -62,8 +63,90 @@ def partners(graph: ig.Graph, vertex: int, mode: str) -> list[dict]:
     return sorted(rows, key=lambda r: -r["synapses"])
 
 
+def partner_list(rows: list[dict]) -> str:
+    """Partner types as inline code with their superclass and synapse count."""
+    return ", ".join(f"`{r['cell_type']}` ({r['superclass']}, {r['synapses']} synapses)" for r in rows)
+
+
+def write_report(candidates: pd.DataFrame, stats: dict, n_types: int) -> None:
+    """Write ``hidden_bottleneck.md`` and echo it."""
+    lines = report_lines(candidates, stats, n_types)
+    (RESULTS / "hidden_bottleneck.md").write_text("\n".join(lines), encoding="utf-8")
+    print("\n".join(lines))
+
+
+def report_lines(candidates: pd.DataFrame, stats: dict, n_types: int) -> list[str]:
+    """Markdown report for the candidates and the featured case on a graph of ``n_types`` cell types."""
+    return [
+        "# Hidden bottleneck",
+        "",
+        "## Criteria",
+        "",
+        f"A type qualifies if, on the intact graph of {n_types} types, it ranks in the bottom half by total "
+        "degree (input partner types plus output partner types, so a partner connected in both directions counts "
+        "twice) and in the bottom half by PageRank, yet in the top "
+        "1% by sensory-motor betweenness (the number of shortest sensory-to-motor routes, summed over all reachable "
+        "pairs, that pass through it). Percentiles are mid-rank. All numbers below come from a single run of "
+        "`pipeline/hidden_bottleneck.py` on the same graph.",
+        "",
+        f"{len(candidates)} types qualify (`results/hidden_bottleneck_candidates.csv`):",
+        "",
+        "| type | superclass | degree (percentile) | PageRank percentile | sensory-motor betweenness (percentile) |",
+        "|---|---|---|---|---|",
+        *[f"| `{r.cell_type}` | {r.superclass} | {r.degree} ({r.degree_pct:.1f}) | {r.pagerank_pct:.1f} | "
+          f"{r.sm_betweenness:,.0f} ({r.sm_betweenness_pct:.2f}) |" for r in candidates.head(20).itertuples()],
+        "",
+        f"## The most extreme case: `{stats['cell_type']}`",
+        "",
+        "| quantity | value |",
+        "|---|---|",
+        f"| superclass | {stats['superclass']} |",
+        f"| neurons in the type | {stats['n_neurons']} |",
+        f"| input / output partner types | {stats['in_degree']} / {stats['out_degree']} (total {stats['degree']}; "
+        f"median over all types {stats['median_degree']:.0f}) |",
+        f"| degree percentile | {stats['degree_percentile']:.1f} |",
+        f"| input / output synapses (in the graph) | {stats['in_strength']:,.0f} / {stats['out_strength']:,.0f} |",
+        f"| PageRank percentile | {stats['pagerank_percentile']:.1f} |",
+        f"| sensory-motor betweenness | {stats['sm_betweenness']:,.1f} (rank {stats['sm_betweenness_rank']} of "
+        f"{n_types}, percentile {stats['sm_betweenness_percentile']:.2f}) |",
+        f"| share of sensory-to-motor shortest routes through it | {100 * stats['share_of_shortest_routes']:.2f}% of "
+        f"{stats['reachable_pairs']:,} reachable pairs |",
+        f"| reachable pairs lost if it alone is removed | {stats['pairs_lost_when_removed']:,} |",
+        f"| pairs whose shortest route gets longer if it is removed | {stats['pairs_with_longer_shortest_path_when_removed']:,} |",
+        f"| flow capacity, intact → without it | {stats['intact_flow']} → {stats['flow_after_removal']} |",
+        "",
+        f"Strongest inputs: {partner_list(stats['strongest_inputs'])}.",
+        "",
+        f"Strongest outputs: {partner_list(stats['strongest_outputs'])}.",
+        "",
+        "## Why it matters",
+        "",
+        "Degree and PageRank are the usual shortcuts for spotting important nodes, and by both this type is "
+        "unremarkable. It stands out only when paths are counted between the specific start and end points that "
+        "matter for behavior, sensory neurons and descending or motor neurons.",
+        "",
+        f"What that does and does not mean: removing this type alone cuts flow capacity by "
+        f"{stats['intact_flow'] - stats['flow_after_removal']} of {stats['intact_flow']} and disconnects "
+        f"{stats['pairs_lost_when_removed']:,} sensory-motor pairs, while lengthening the shortest route for "
+        f"{stats['pairs_with_longer_shortest_path_when_removed']:,}. Concentrating shortest routes is therefore not "
+        "the same as being indispensable: parallel routes exist, they are just longer. These are structural "
+        "measurements on the wiring diagram; whether the fly depends on this type has not been tested.",
+        "",
+    ]
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--from-results", action="store_true",
+                        help="rebuild the report from results/hidden_bottleneck.json instead of recomputing")
+    args = parser.parse_args()
+
     graph = load_type_graph()
+    if args.from_results:
+        saved = json.loads((RESULTS / "hidden_bottleneck.json").read_text(encoding="utf-8"))
+        write_report(pd.DataFrame(saved["candidates"]), saved["example"], graph.vcount())
+        return
+
     sources, targets = load_sensory_motor_sets()
     scores = intact_scores(graph, sources, targets)
     scores["superclass"] = graph.vs["superclass"]
@@ -119,68 +202,7 @@ def main() -> None:
                     "candidates": candidates[["cell_type", "superclass", "degree", "degree_pct", "pagerank_pct",
                                               "sm_betweenness", "sm_betweenness_pct"]].to_dict("records"),
                     "example": stats}, indent=2) + "\n", encoding="utf-8")
-
-    def partner_list(rows: list[dict]) -> str:
-        return ", ".join(f"`{r['cell_type']}` ({r['superclass']}, {r['synapses']} synapses)" for r in rows)
-
-    lines = [
-        "# Hidden bottleneck",
-        "",
-        "## Criteria",
-        "",
-        f"A type qualifies if, on the intact graph of {graph.vcount()} types, it ranks in the bottom half by total "
-        "degree (input partner types plus output partner types, so a partner connected in both directions counts "
-        "twice) and in the bottom half by PageRank, yet in the top "
-        "1% by sensory-motor betweenness (the number of shortest sensory-to-motor routes, summed over all reachable "
-        "pairs, that pass through it). Percentiles are mid-rank. All numbers below come from a single run of "
-        "`pipeline/hidden_bottleneck.py` on the same graph.",
-        "",
-        f"{len(candidates)} types qualify (`results/hidden_bottleneck_candidates.csv`):",
-        "",
-        "| type | superclass | degree (percentile) | PageRank percentile | sensory-motor betweenness (percentile) |",
-        "|---|---|---|---|---|",
-        *[f"| `{r.cell_type}` | {r.superclass} | {r.degree} ({r.degree_pct:.0f}) | {r.pagerank_pct:.0f} | "
-          f"{r.sm_betweenness:,.0f} ({r.sm_betweenness_pct:.2f}) |" for r in candidates.head(20).itertuples()],
-        "",
-        f"## The most extreme case: `{stats['cell_type']}`",
-        "",
-        "| quantity | value |",
-        "|---|---|",
-        f"| superclass | {stats['superclass']} |",
-        f"| neurons in the type | {stats['n_neurons']} |",
-        f"| input / output partner types | {stats['in_degree']} / {stats['out_degree']} (total {stats['degree']}; "
-        f"median over all types {stats['median_degree']:.0f}) |",
-        f"| degree percentile | {stats['degree_percentile']:.1f} |",
-        f"| input / output synapses (in the graph) | {stats['in_strength']:,.0f} / {stats['out_strength']:,.0f} |",
-        f"| PageRank percentile | {stats['pagerank_percentile']:.1f} |",
-        f"| sensory-motor betweenness | {stats['sm_betweenness']:,.1f} (rank {stats['sm_betweenness_rank']} of "
-        f"{graph.vcount()}, percentile {stats['sm_betweenness_percentile']:.2f}) |",
-        f"| share of sensory-to-motor shortest routes through it | {100 * stats['share_of_shortest_routes']:.2f}% of "
-        f"{stats['reachable_pairs']:,} reachable pairs |",
-        f"| reachable pairs lost if it alone is removed | {stats['pairs_lost_when_removed']:,} |",
-        f"| pairs whose shortest route gets longer if it is removed | {stats['pairs_with_longer_shortest_path_when_removed']:,} |",
-        f"| flow capacity, intact → without it | {stats['intact_flow']} → {stats['flow_after_removal']} |",
-        "",
-        f"Strongest inputs: {partner_list(stats['strongest_inputs'])}.",
-        "",
-        f"Strongest outputs: {partner_list(stats['strongest_outputs'])}.",
-        "",
-        "## Why it matters",
-        "",
-        "Degree and PageRank are the usual shortcuts for spotting important nodes, and by both this type is "
-        "unremarkable. It stands out only when paths are counted between the specific start and end points that "
-        "matter for behavior, sensory neurons and descending or motor neurons.",
-        "",
-        f"What that does and does not mean: removing this type alone cuts flow capacity by "
-        f"{stats['intact_flow'] - stats['flow_after_removal']} of {stats['intact_flow']} and disconnects "
-        f"{stats['pairs_lost_when_removed']:,} sensory-motor pairs, while lengthening the shortest route for "
-        f"{stats['pairs_with_longer_shortest_path_when_removed']:,}. Concentrating shortest routes is therefore not "
-        "the same as being indispensable: parallel routes exist, they are just longer. These are structural "
-        "measurements on the wiring diagram; whether the fly depends on this type has not been tested.",
-        "",
-    ]
-    (RESULTS / "hidden_bottleneck.md").write_text("\n".join(lines), encoding="utf-8")
-    print("\n".join(lines))
+    write_report(candidates, stats, graph.vcount())
 
 
 if __name__ == "__main__":

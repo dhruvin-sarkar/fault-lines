@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pipeline.hidden_bottleneck import distance_matrix, find_candidates, partners, percentile_ranks
+from pipeline.hidden_bottleneck import distance_matrix, find_candidates, partners, percentile_ranks, report_lines
 
 
 def test_percentile_ranks_use_mid_ranks():
@@ -92,3 +92,20 @@ def test_partners_are_listed_strongest_first_with_their_superclass():
         {"cell_type": "s1", "superclass": "sensory", "synapses": 4},
     ]
     assert partners(graph, vertex, "out") == [{"cell_type": "m1", "superclass": "motor", "synapses": 7}]
+
+
+def test_report_gives_degree_and_pagerank_percentiles_to_one_decimal():
+    candidates = pd.DataFrame([{"cell_type": "ALIN7", "superclass": "cb_intrinsic", "degree": 34,
+                                "degree_pct": 45.65994, "pagerank_pct": 9.84172, "sm_betweenness": 1881.328,
+                                "sm_betweenness_pct": 99.82555}])
+    partner = [{"cell_type": "p", "superclass": "cb_sensory", "synapses": 3}]
+    stats = {"cell_type": "ALIN7", "superclass": "cb_intrinsic", "n_neurons": 2, "in_degree": 19, "out_degree": 15,
+             "degree": 34, "median_degree": 36.0, "degree_percentile": 45.65994, "in_strength": 3699.0,
+             "out_strength": 4753.0, "pagerank_percentile": 9.84172, "sm_betweenness": 1881.328,
+             "sm_betweenness_rank": 21, "sm_betweenness_percentile": 99.82555, "share_of_shortest_routes": 0.0079,
+             "reachable_pairs": 237405, "pairs_lost_when_removed": 0, "pairs_with_longer_shortest_path_when_removed": 849,
+             "intact_flow": 10647, "flow_after_removal": 10638, "strongest_inputs": partner, "strongest_outputs": partner}
+    lines = report_lines(candidates, stats, 11751)
+    assert "| `ALIN7` | cb_intrinsic | 34 (45.7) | 9.8 | 1,881 (99.83) |" in lines
+    assert "| degree percentile | 45.7 |" in lines and "| PageRank percentile | 9.8 |" in lines
+    assert any("rank 21 of 11751" in line for line in lines)

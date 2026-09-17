@@ -8,10 +8,10 @@ A type qualifies if, on the intact graph of 11751 types, it ranks in the bottom 
 
 | type | superclass | degree (percentile) | PageRank percentile | sensory-motor betweenness (percentile) |
 |---|---|---|---|---|
-| `ALIN7` | cb_intrinsic | 34 (46) | 10 | 1,881 (99.83) |
-| `ALON3` | cb_intrinsic | 29 (30) | 36 | 1,558 (99.72) |
-| `GNG354` | cb_intrinsic | 32 (40) | 16 | 952 (99.28) |
-| `ANXXX264` | ascending_neuron | 34 (46) | 39 | 865 (99.20) |
+| `ALIN7` | cb_intrinsic | 34 (45.7) | 9.8 | 1,881 (99.83) |
+| `ALON3` | cb_intrinsic | 29 (30.0) | 36.1 | 1,558 (99.72) |
+| `GNG354` | cb_intrinsic | 32 (39.5) | 15.5 | 952 (99.28) |
+| `ANXXX264` | ascending_neuron | 34 (45.7) | 38.8 | 865 (99.20) |
 
 ## The most extreme case: `ALIN7`
 
