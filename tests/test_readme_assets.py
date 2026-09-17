@@ -115,10 +115,30 @@ def test_half_flow_batch():
     assert ra.half_flow_batch([100, 90, 60], 100) is None
 
 
-def test_italicize_wraps_words():
-    assert ra.italicize("adult Drosophila CNS", ["Drosophila"]) == (
-        'adult <tspan font-style="italic">Drosophila</tspan> CNS'
-    )
+def test_italic_segments_split_out_words():
+    assert ra.italic_segments("adult Drosophila CNS", ["Drosophila"]) == [
+        ("adult ", False), ("Drosophila", True), (" CNS", False)
+    ]
+    assert ra.italic_segments("no match", ["Drosophila"]) == [("no match", False)]
+    assert ra.italic_segments("plain", []) == [("plain", False)]
+
+
+def test_ordinal():
+    assert [ra.ordinal(n) for n in (1, 2, 3, 4, 11, 12, 13, 21, 22, 101, 111)] == [
+        "1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "101st", "111th"
+    ]
+
+
+def test_betweenness_floor_sits_below_the_lowest_candidate():
+    criteria = {"sm_betweenness_percentile_at_least": 99.0}
+    assert ra.betweenness_floor([{"sm_betweenness_pct": 99.2}, {"sm_betweenness_pct": 99.8}], criteria) == 98
+    assert ra.betweenness_floor([{"sm_betweenness_pct": 97.5}], criteria) == 96
+
+
+def test_power_law_ccdf_is_one_at_xmin_and_decreasing():
+    values = ra.power_law_ccdf(np.array([8.0, 16.0, 100.0]), 2.0, 8.0)
+    assert values[0] == pytest.approx(1)
+    assert values[0] > values[1] > values[2] > 0
 
 
 def test_svg_render_is_well_formed_and_accessible():
@@ -127,15 +147,35 @@ def test_svg_render_is_well_formed_and_accessible():
     svg.line(0, 0, 10, 10, "signal", dash="4 4")
     svg.polyline([0, 5, 10], [0, 5, 0], "sm_betweenness")
     svg.dot(5, 5, 4, "random", hollow=True, ring=2)
-    document = svg.render("Title", "A description")
+    document = svg.render("Flow & reachability", "A description < 50%")
     root = ET.fromstring(document)
     assert root.get("viewBox") == f"0 0 {ra.WIDTH} 200"
     assert root.get("role") == "img"
     ns = "{http://www.w3.org/2000/svg}"
-    assert root.find(f"{ns}title").text == "Title"
-    assert root.find(f"{ns}desc").text == "A description"
-    assert "Flow &amp; reachability &lt; 50%" in document
+    assert root.find(f"{ns}title").text == "Flow & reachability"
+    assert root.find(f"{ns}desc").text == "A description < 50%"
     assert ra.STRATEGY_INK["dark"]["sm_betweenness"] in document
+
+
+def test_text_is_set_as_outlines_with_each_glyph_defined_once():
+    svg = ra.Svg(100, "light")
+    svg.text(10, 50, "reachability")
+    document = svg.render("t", "d")
+    assert "<text" not in document
+    ids = [p.get("id") for p in ET.fromstring(document).iter("{http://www.w3.org/2000/svg}path") if p.get("id")]
+    assert len(ids) == len(set(ids)) == len(set("reachability"))
+    assert document.count("<use ") == len("reachability")
+
+
+def test_text_anchor_offsets_by_the_measured_width():
+    svg = ra.Svg(100, "light")
+    width = svg.text(500, 50, "Halves at", 26, anchor="end")
+    assert width == pytest.approx(ra.text_width("Halves at", 26))
+    origin = float(svg.parts[-1].split("matrix(")[1].split()[4])
+    assert origin == pytest.approx(500 - width, abs=0.06)
+    middle = ra.Svg(100, "light")
+    middle.text(500, 50, "Halves at", 26, anchor="middle")
+    assert float(middle.parts[-1].split("matrix(")[1].split()[4]) == pytest.approx(500 - width / 2, abs=0.06)
 
 
 def test_theme_tokens_resolve_per_theme():
@@ -151,14 +191,16 @@ def test_every_asset_builds_from_the_committed_results(tmp_path):
     names = {p.name for p in written}
     assert "plate-title.svg" in names
     for stem in ("stat-plate", "fig-curves", "fig-thresholds", "fig-regions", "fig-classes",
-                 "fig-compartments", "methods-pipeline"):
+                 "fig-compartments", "fig-connections", "fig-bottleneck", "fig-avalanches", "methods-pipeline"):
         assert {f"{stem}-light.svg", f"{stem}-dark.svg"} <= names
     for path in written:
         text = path.read_text(encoding="utf-8")
         ET.fromstring(text)
         for forbidden in (chr(0x2014), chr(0x2013), chr(0x00B7)):
             assert forbidden not in text, (path.name, forbidden)
-        assert "<text" in text
+        assert "<text" not in text
+        assert "<use " in text
+        assert path.stat().st_size < 300_000, path.name
 
 
 def test_headline_numbers_come_from_the_results():

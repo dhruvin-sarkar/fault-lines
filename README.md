@@ -6,7 +6,7 @@
 
 ## Abstract
 
-HHMI Janelia and Google Research have released a complete wiring diagram of an adult male fruit fly's central nervous system, brain and nerve cord together.[^berg] A whole nervous system contains both ends of behavior: the sensory neurons that bring information in and the descending and motor neurons that carry commands out. We asked how much of it has to be removed before sensory input can no longer be routed to motor output, and whether the order of removal matters. Degree-based percolation has been applied to the FlyWire whole-brain connectome, tracking its largest connected components;[^lin] here brain and nerve cord are taken together, the measure is directed routing from sensory input to motor output, and a degree-preserving null model is pre-registered. The connectome was reduced to a directed graph of 11,751 cell types and 243,439 connections, and routing was measured as the maximum number of edge-disjoint paths from 368 sensory types to 665 descending and motor types, 10,647 in the intact graph. Six removal orders were fixed in advance and applied in adaptive batches.[^albert] Targeted removal is far more damaging than random removal: by output synapses, routing capacity halves after 4.1% of types, against 28.3% at random. The first halving is a thinning of parallel routes, not a loss of connection; disconnection comes later and, under sensory-motor betweenness, almost all at once. The degree-preserving null model that tests whether the real wiring is more fragile than chance is still computing.
+HHMI Janelia and Google Research have released a complete wiring diagram of an adult male fruit fly's central nervous system, brain and nerve cord together.[^berg] We asked how much of it has to be removed before sensory input can no longer reach motor output, and whether the order of removal matters. Percolation on the FlyWire brain connectome has tracked its largest connected components;[^lin] here the measure is directed routing, the number of edge-disjoint paths from 368 sensory to 665 descending and motor cell types (10,647 when intact), in a graph of 11,751 types and 243,439 connections. Six removal orders were pre-registered and applied in adaptive batches.[^albert] Removing types by output synapses halves routing after 4.1% are gone, against 28.3% at random, and routes thin out long before anything disconnects. The degree-preserving null model that tests whether the real wiring is more fragile than chance is still computing.
 
 ## Results
 
@@ -21,7 +21,7 @@ HHMI Janelia and Google Research have released a complete wiring diagram of an a
 - [x] Every targeted critical fraction lies below the lower bound of the random-removal 95% CI
 - [x] Fourteen behaviorally validated cell types rank above other types in sensory-motor betweenness (one-sided p = 0.045; p = 0.10 with the positive control MN9)
 - [x] For 205 of 4,449 informative bilateral types, removing both sides costs more than the sum of each side (one-sided p = 5.2 × 10⁻³⁷); 4,235 are exactly additive
-- [ ] Structural cascades follow a power law (not established: plausible in the primary pooling, p = 0.202, rejected in the sensitivity pooling, p = 0.036; see [avalanches](#further-results))
+- [ ] Structural cascades follow a power law (not established: plausible in the primary pooling, p = 0.202, rejected in the sensitivity pooling, p = 0.036; see [where it falls short](#where-it-falls-short))
 - [ ] The real graph is more fragile than 200 degree-preserving randomized graphs (still computing; see [the null model](#the-null-model))
 
 <details>
@@ -46,7 +46,7 @@ HHMI Janelia and Google Research have released a complete wiring diagram of an a
 
 <p><a href="https://dhruvin-sarkar.github.io/fault-lines/#collapse"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/readme/fig-curves-dark.svg"><img src="assets/readme/fig-curves-light.svg" width="880" alt="Figure 1. Line chart of sensory-to-motor flow capacity retained as cell types are removed from 0% to 50%. All five targeted orders fall steeply and cross the dashed half line early; random removal, the mean of 30 trials with a narrow band, falls slowly and ends near 23%. Fractions removed when flow first halves: weighted out-degree 4.1%, betweenness 9.0%, sensory-motor betweenness 9.6%, weighted in-degree 13.9%, PageRank 18.7%, random 28.3%."></picture></a></p>
 
-**Figure 1. Every targeted order collapses routing long before random removal does.** Cell types are removed in batches of 1% of those remaining, and each targeted score is recomputed on the reduced graph before the next batch, which is usually more damaging than a ranking fixed on the intact graph (Holme et al. 2002).[^holme] Flow capacity counts edge-disjoint routes from the sensory to the descending and motor types; by max-flow min-cut duality it is also the smallest number of connections whose loss would separate them.[^ford] Removing the types with the most output synapses first is the most damaging order: after 2.99% of types are gone, 59% of flow capacity is left. At 50.25% removed, random removal still keeps 22.7% of flow on average over 30 trials.
+**Figure 1. Every targeted order collapses routing long before random removal does.** Cell types are removed in batches of 1% of those remaining, and each targeted score is recomputed on the reduced graph before the next batch, which is usually more damaging than a ranking fixed on the intact graph.[^holme] Flow capacity counts edge-disjoint routes from the sensory to the descending and motor types; by max-flow min-cut duality it is also the smallest number of connections whose loss would separate them.[^ford] Removing the types with the most output synapses first is the most damaging order: after 2.99% of types are gone, 59% of flow capacity is left. At 50.25% removed, random removal still keeps 22.7% of flow on average over 30 trials.
 
 <details>
 <summary>Values behind Figure 1</summary>
@@ -72,9 +72,9 @@ The two metrics rank the orders differently. Weighted out-degree removes capacit
 
 <p><a href="https://dhruvin-sarkar.github.io/fault-lines/#thresholds"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/readme/fig-thresholds-dark.svg"><img src="assets/readme/fig-thresholds-light.svg" width="880" alt="Figure 2. Dot plot of the fraction of cell types removed when flow capacity first halves: weighted out-degree 4.1%, betweenness 9.0%, sensory-motor betweenness 9.6%, weighted in-degree 13.9%, PageRank 18.7%. Random removal: 30 trials between 25.5% and 31.3%, mean 28.3% with a 95% CI of 27.7% to 28.9%, shaded across every row. Every targeted order lies left of the interval; random removal needs 6.9 times as many types as weighted out-degree."></picture></a></p>
 
-**Figure 2. Random removal needs 6.9 times as many cell types as removal by output synapses.** The critical fraction is the share of types removed when flow capacity first falls below half of its intact value, interpolated between the last batch above half and the first below it. The same cutoff applies to every order. Across the 30 random trials it ranges from 25.5% to 31.3%, and every targeted value lies well below that range. A gap of this size between random and targeted removal resembles the pattern described for networks with heavy-tailed connectivity.[^albert] Here the out-degree and out-strength tails are heavy, but a lognormal or truncated power law describes them better than a pure power law.[^clauset]
+**Figure 2. Random removal needs 6.9 times as many cell types as removal by output synapses.** The critical fraction is the share of types removed when flow capacity first falls below half of its intact value, interpolated between the last batch above half and the first below it. The same cutoff applies to every order. Across the 30 random trials it ranges from 25.5% to 31.3%, and every targeted value lies well below that range. A gap of this size between random and targeted removal resembles the pattern described for networks with heavy-tailed connectivity.[^albert] Here the [out-degree and out-strength tails are heavy](https://dhruvin-sarkar.github.io/fault-lines/#structure), but a lognormal or truncated power law describes them better than a pure power law.[^clauset]
 
-**Capacity thins before anything disconnects.** At each order's own half-flow batch, at most 37 surviving types have lost every directed path from sensory input. Disconnection comes later and differs sharply between orders. Under sensory-motor betweenness no surviving type is cut off up to 10.5% removed and only 18 by 20.7%; then a single batch, from 30.5% to 31.2% removed, cuts off 6,046 types at once, when flow capacity has already fallen to 3.3% of intact. Measures based on the largest connected component, which dominate the attack-tolerance literature, would register little of the first phase.
+**[Capacity thins before anything disconnects.](https://dhruvin-sarkar.github.io/fault-lines/#silenced)** At each order's own half-flow batch, at most 37 surviving types have lost every directed path from sensory input. Disconnection comes later and differs sharply between orders. Under sensory-motor betweenness no surviving type is cut off up to 10.5% removed and only 18 by 20.7%; then a single batch, from 30.5% to 31.2% removed, cuts off 6,046 types at once, when flow capacity has already fallen to 3.3% of intact. Measures based on the largest connected component, which dominate the attack-tolerance literature, would register little of the first phase.
 
 <details>
 <summary>Disconnection across the type population</summary>
@@ -155,7 +155,7 @@ p = (1 + k) / 201, where k is the number of same-size random sets that lose at l
 
 ## Brain and nerve cord
 
-<p><a href="https://dhruvin-sarkar.github.io/fault-lines/#brain-nerve-cord"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/readme/fig-compartments-dark.svg"><img src="assets/readme/fig-compartments-light.svg" width="880" alt="Figure 5. Slope chart of flow-capacity AUC for each removal order in the brain-dominant subgraph of 8,123 types and the nerve cord-dominant subgraph of 3,628 types; lower is more fragile. Brain: sensory-motor betweenness 0.151, weighted out-degree 0.257, weighted in-degree 0.504, betweenness 0.544, PageRank 0.664, random 0.572. Nerve cord: sensory-motor betweenness 0.363, weighted out-degree 0.276, weighted in-degree 0.228, betweenness 0.477, PageRank 0.251, random 0.579. Under random removal they do not differ significantly, Welch t = -1.54, p = 0.13, but the most damaging order changes."></picture></a></p>
+<p><a href="https://dhruvin-sarkar.github.io/fault-lines/#brain-nerve-cord"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/readme/fig-compartments-dark.svg"><img src="assets/readme/fig-compartments-light.svg" width="880" alt="Figure 5. Slope chart of flow-capacity AUC for each removal order in the brain-dominant subgraph of 8,123 types and the nerve cord-dominant subgraph of 3,628 types; lower is more fragile. Brain: sensory-motor betweenness 0.151, weighted out-degree 0.257, weighted in-degree 0.504, betweenness 0.544, PageRank 0.664, random 0.572. Nerve cord: sensory-motor betweenness 0.363, weighted out-degree 0.276, weighted in-degree 0.228, betweenness 0.477, PageRank 0.251, random 0.579. Under random removal they do not differ significantly, Welch t = −1.54, p = 0.13, but the most damaging order changes."></picture></a></p>
 
 **Figure 5. What is critical depends on the circuit.** Each type was assigned to the brain or the nerve cord by where most of its synapses are, and each subgraph received its own sensory and motor sets and the full protocol. Under random removal the two do not differ significantly (Welch t = −1.54, p = 0.13). Under targeted removal they behave differently: sensory-motor betweenness is the most damaging order in the brain (AUC 0.151) and comparatively mild in the nerve cord (0.363), where weighted in-degree (0.228) and PageRank (0.251) lead. In the brain, PageRank removal (0.664) is less damaging than random removal. No direction was hypothesized, the subgraphs differ in size and density, and the targeted runs are single runs, so these describe two graphs rather than estimating an effect.
 
@@ -180,21 +180,65 @@ p = (1 + k) / 201, where k is the number of same-size random sets that lose at l
 
 </details>
 
+## Connections, not only cell types
+
+<p><a href="https://dhruvin-sarkar.github.io/fault-lines/#connections"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/readme/fig-connections-dark.svg"><img src="assets/readme/fig-connections-light.svg" width="880" alt="Figure 6. Two line charts over the first 50% of the 243,439 connections removed, in batches of 1%. Left, flow capacity retained: removing the connections with the most synapses first crosses half after 26.8% and ends at 18.4%; random order crosses half after a mean of 47.6% over 5 trials, 47.2% to 48.0%, and trial 0 ends at 47.2%; weakest first never crosses half and ends at 60.1%. Right, connected sensory-motor pairs retained: strongest first ends at 51.0%, weakest first at 94.5% and random trial 0 at 99.2%."></picture></a></p>
+
+**Figure 6. Synapse count is not routing capacity.** Flow capacity gives every connection one unit, so removing connections by synapse count asks whether the heaviest connections also carry the routes.[^kaiser] Removing the strongest first halves flow after 26.8% of the 243,439 connections; random orders need 47.6% on average (47.2% to 48.0% over 5 orders); removing the weakest first never halves it within 50%. Yet weakest-first removal disconnects more sensory-motor pairs than random removal, so some pairs depend on a thin connection as their only route. A heavy connection can be redundant, and a thin one can be the only way across.
+
+<details>
+<summary>Values behind Figure 6</summary>
+
+| order | connections removed when flow halves | flow left at 49.99% removed | connected pairs left |
+|---|---:|---:|---:|
+| strongest first | 26.8% | 18.4% | 51.0% |
+| random, 5 orders | 47.6% (47.2% to 48.0%) | 47.2% (trial 0) | 99.2% (trial 0) |
+| weakest first | not reached | 60.1% | 94.5% |
+
+This analysis was added after the pre-registration and is exploratory.
+
+<sub>Source: <a href="results/edge_attack.md">results/edge_attack.md</a>, <a href="results/edge_attack.csv">results/edge_attack.csv</a></sub>
+
+</details>
+
+## A hidden bottleneck
+
+<p><a href="https://dhruvin-sarkar.github.io/fault-lines/#bottleneck"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/readme/fig-bottleneck-dark.svg"><img src="assets/readme/fig-bottleneck-light.svg" width="880" alt="Figure 7. Top: 4 cell types in the bottom half by degree and by PageRank but in the top 1% by sensory-motor betweenness, as dots on percentile tracks: ALIN7, degree percentile 45.7, PageRank 9.8, sensory-motor betweenness 99.83; ALON3, degree percentile 30.0, PageRank 36.1, sensory-motor betweenness 99.72; GNG354, degree percentile 39.5, PageRank 15.5, sensory-motor betweenness 99.28; ANXXX264, degree percentile 45.7, PageRank 38.8, sensory-motor betweenness 99.20. Bottom: ALIN7, a type of 2 neurons, with its five strongest inputs (ORN_VA1v 1,066, ORN_VA1d 761, JO-FV 205, BM_InOm 170, BM_Vib 154 synapses), all sensory, and five strongest outputs (il3LN6 1,396, DL3_lPN 506, VA1d_adPN 454, AN01A089 397, VA1v_adPN 394). Removing it alone loses 9 of 10,647 routes and disconnects 0 pairs, but 849 pairs take a longer shortest route. It ranks 21st of 11,751 by sensory-motor betweenness."></picture></a></p>
+
+**Figure 7. Lying on many shortest routes is not the same as being indispensable.** The criteria were fixed in advance: the bottom half of all types by degree and by PageRank, and the top 1% by sensory-motor betweenness. Four types qualify. The most extreme, `ALIN7`, is a two-neuron central brain type fed by olfactory and mechanosensory neurons that ranks 21st of 11,751. Removing it disconnects no pair and costs 9 routes, but lengthens the shortest route for 849 pairs: parallel routes exist, and they are longer. Whether flies depend on any of these types has not been tested.
+
+<details>
+<summary>Values behind Figure 7</summary>
+
+| type | superclass | degree (percentile) | PageRank percentile | sensory-motor betweenness (percentile) |
+|---|---|---:|---:|---:|
+| `ALIN7` | central brain intrinsic | 34 (45.7) | 9.8 | 1,881 (99.83) |
+| `ALON3` | central brain intrinsic | 29 (30.0) | 36.1 | 1,558 (99.72) |
+| `GNG354` | central brain intrinsic | 32 (39.5) | 15.5 | 952 (99.28) |
+| `ANXXX264` | ascending | 34 (45.7) | 38.8 | 865 (99.20) |
+
+| `ALIN7` | value |
+|---|---|
+| neurons / input and output partner types | 2 / 19 and 15 (median degree over all types 36) |
+| share of sensory-to-motor shortest routes through it | 0.79% of 237,405 connected pairs |
+| flow capacity, intact / without it | 10,647 / 10,638 |
+| pairs disconnected / pairs with a longer shortest route | 0 / 849 |
+
+Percentiles are mid-rank. `ANXXX264` is one of the two types outside the sensory and motor sets whose single removal disconnects any pair.
+
+<sub>Source: <a href="results/hidden_bottleneck.md">results/hidden_bottleneck.md</a>, <a href="results/hidden_bottleneck_candidates.csv">results/hidden_bottleneck_candidates.csv</a></sub>
+
+</details>
+
 ## Further results
 
-**Synapse count is not routing capacity.** Flow capacity gives every connection one unit, so removing connections by synapse count asks whether the heaviest connections also carry the routes.[^kaiser] Removing the strongest first halves flow after 26.8% of the 243,439 connections; random orders need 47.6% on average (47.2% to 48.0% over 5 orders); removing the weakest first never halves it within 50%. A heavy connection can be redundant, and a thin one can be the only way across ([edge_attack.md](results/edge_attack.md)).
+**[Single types are almost never indispensable.](https://dhruvin-sarkar.github.io/fault-lines/#lookup/SApp)** Removed alone, the most costly type is the sensory type `SApp` (310 of 10,647 routes). No type outside the sensory and motor sets costs more than 31 (`lLN2T_b`), and only two, `AMMC029` and `ANXXX264`, disconnect any sensory-motor pair ([single_removal_impacts.csv](results/single_removal_impacts.csv)).
 
-**Single types are almost never indispensable.** Removed alone, the most costly type is the sensory type `SApp` (310 of 10,647 routes). No type outside the sensory and motor sets costs more than 31 (`lLN2T_b`), and only two, `AMMC029` and `ANXXX264`, disconnect any sensory-motor pair ([single_removal_impacts.csv](results/single_removal_impacts.csv)).
+**[The two sides rarely back each other up.](https://dhruvin-sarkar.github.io/fault-lines/#bilateral)** In a graph with one node per type and hemisphere, removing both sides of a type costs more than the mean of removing one side (4,449 informative types, one-sided Wilcoxon signed-rank p < 10⁻³²³, below the smallest positive double; log₁₀ p = −728.2 by the normal approximation) and more than the sum of the two single-side removals (p = 5.2 × 10⁻³⁷). 205 types are superadditive, 4,235 additive and 9 subadditive, and for 12 types the other side is complete structural insurance: either side alone can go without any loss. The largest gains are in sensory types (eight of the nine types at +3 routes or more), where the gain reflects substitution at the entry points into shared downstream capacity ([bilateral_symmetry.md](results/bilateral_symmetry.md)).
 
-**A hidden bottleneck.** Four types rank in the bottom half by degree and by PageRank but in the top 1% by sensory-motor betweenness. The most extreme, `ALIN7`, is a two-neuron central brain type fed by olfactory and mechanosensory neurons that ranks 21st of 11,751. Removing it disconnects no pair and costs 9 routes, but lengthens the shortest route for 849 pairs: concentrating shortest routes is not the same as being indispensable ([hidden_bottleneck.md](results/hidden_bottleneck.md)).
+**[Pairs of sensory types share capacity.](https://dhruvin-sarkar.github.io/fault-lines/#pairs)** Of 31,125 pairs from a pool of 250 high-impact types, 585 lose more together than the sum of their single losses, at most +12 routes (`SNppxx` with `SNta29`), and every such pair is two sensory types. As in the bilateral analysis, this reflects substitution at the entry points into shared downstream capacity, not parallel pathways deeper in the circuit. The pool fixed in advance was dominated by sensory types, so it does not reach the interneuron pairs the search was meant to find ([synthetic_lethal_pairs.md](results/synthetic_lethal_pairs.md)).
 
-**The two sides rarely back each other up.** In a graph with one node per type and hemisphere, removing both sides of a type costs more than the mean of removing one side (4,449 informative types, one-sided Wilcoxon signed-rank p < 10⁻³²³, below the smallest positive double; log₁₀ p = −728.2 by the normal approximation) and more than the sum of the two single-side removals (p = 5.2 × 10⁻³⁷). 205 types are superadditive, 4,235 additive and 9 subadditive, and for 12 types the other side is complete structural insurance: either side alone can go without any loss. The largest gains are in sensory types (eight of the nine types at +3 routes or more), where the gain reflects substitution at the entry points into shared downstream capacity ([bilateral_symmetry.md](results/bilateral_symmetry.md)).
-
-**Pairs of sensory types share capacity.** Of 31,125 pairs from a pool of 250 high-impact types, 585 lose more together than the sum of their single losses, at most +12 routes (`SNppxx` with `SNta29`), and every such pair is two sensory types. The pool fixed in advance was dominated by sensory types, so it does not reach the interneuron pairs the search was meant to find ([synthetic_lethal_pairs.md](results/synthetic_lethal_pairs.md)).
-
-**Cascades are not established as scale-free.** A discrete power law fitted by maximum likelihood is plausible in the pre-registered pooling (α = 2.011, bootstrap p = 0.202) but rejected when all 30 random trials are pooled (p = 0.036), and a lognormal cannot be distinguished in either ([avalanche_analysis.md](results/avalanche_analysis.md)).
-
-**Agreement with behavioral experiments is modest.** Fourteen cell types with published activation or silencing phenotypes, fixed before scoring, rank above other types in sensory-motor betweenness. The result is close to the threshold and weakens when the positive control is added.
+**[Agreement with behavioral experiments is modest.](https://dhruvin-sarkar.github.io/fault-lines/#literature)** Fourteen cell types with published activation or silencing phenotypes, fixed before scoring, rank above other types in sensory-motor betweenness. The result is close to the threshold and weakens when the positive control is added.
 
 <details>
 <summary>Curated cell types and tests</summary>
@@ -229,7 +273,7 @@ Mann-Whitney U tests against all other types. Percentiles are mid-rank, so 9.8 i
 
 </details>
 
-**Against published thresholds.** The 4.1% threshold lies in the range reported for engineered hub-dominated networks under degree or load attack, such as the Internet at about 3% and the North American power grid, which loses up to 60% of connectivity when 4% of substations are removed, and well below the roughly 40% reported for human functional brain networks. The breakdown criteria differ, so this comparison is qualitative ([network_comparison.md](results/network_comparison.md)).
+**[Against published thresholds.](https://dhruvin-sarkar.github.io/fault-lines/#thresholds)** The 4.1% threshold lies in the range reported for engineered hub-dominated networks under degree or load attack, such as the Internet at about 3% and the North American power grid, which loses up to 60% of connectivity when 4% of substations are removed, and well below the roughly 40% reported for human functional brain networks. The breakdown criteria differ, so this comparison is qualitative ([network_comparison.md](results/network_comparison.md)).
 
 ## The null model
 
@@ -240,6 +284,13 @@ The pre-registered hypothesis, restated before any randomized graph was scored, 
 
 ## Where it falls short
 
+> [!CAUTION]
+> Two pre-specified checks are not met. Structural cascades were to be tested for a power law, and one is not established: the fit is plausible in the pre-registered pooling (bootstrap p = 0.202) but rejected when all 30 random trials are pooled (p = 0.036), and a lognormal cannot be distinguished in either. The degree-preserving null model, the test of whether the real wiring is more fragile than chance, is still computing, so that check is still open. Both are reported as they stand.
+
+<p><a href="https://dhruvin-sarkar.github.io/fault-lines/#avalanches"><picture><source media="(prefers-color-scheme: dark)" srcset="assets/readme/fig-avalanches-dark.svg"><img src="assets/readme/fig-avalanches-light.svg" width="880" alt="Figure 8. Log-log plot of the share of structural cascades at least a given size, for the primary pooling of one run per removal order (229 positive sizes) and the sensitivity pooling with all 30 random trials (342 positive sizes), each with its fitted discrete power law. Primary: exponent 2.011 above size 8, bootstrap p = 0.202, plausible. Sensitivity: exponent 1.872 above size 4, bootstrap p = 0.036, rejected. Against a lognormal the likelihood ratio is not significant in either pooling (p = 0.314 and 0.752). The largest cascade is 6,046 types."></picture></a></p>
+
+**Figure 8. The cascade sizes do not settle the power-law question.** After each batch, the cascade size is the number of surviving types that have just lost every path from sensory input. A discrete power law was fitted by maximum likelihood with the smallest fitted size chosen by the Kolmogorov-Smirnov distance, and tested with a semi-parametric bootstrap of 1,000 synthetic sets.[^clauset] The tail is dominated by a few very large events, including the single batch of 6,046 types under sensory-motor betweenness.
+
 - **Structure, not function:** removing a type from the graph is not silencing it in an animal. There is no synaptic sign, no electrical synapse, no neuromodulation and no activity.
 - **Cell-type aggregation:** a type of one neuron counts the same as a type of thousands. The eleven visual sensory types hold 6,098 neurons but contribute few sources.
 - **The 1% input threshold:** it caps in-degree at 100 partner types and decides which weak routes exist. It was fixed in advance and no alternative was tested.
@@ -249,6 +300,26 @@ The pre-registered hypothesis, restated before any randomized graph was scored, 
 - **Exploratory analyses:** the full single-type removal table, disconnection across the type population, regional and superclass removal, the structural profile, the edge attack and the published-threshold comparison were added after the pre-registration, and the p-values among them are uncorrected.
 - **One animal:** a single male fly, at one annotation release. Individual variability and reconstruction errors are not captured.
 - **Review:** none of this has been peer reviewed.
+
+<details>
+<summary>Cascade fits</summary>
+
+| | primary: one run per order | sensitivity: all 30 random trials |
+|---|---:|---:|
+| batches / zero-size / fitted | 414 / 185 / 229 | 2,415 / 2,073 / 342 |
+| exponent α | 2.011 ± 0.120 | 1.872 ± 0.078 |
+| smallest fitted size (sizes in tail) | 8 (71) | 4 (125) |
+| KS distance | 0.0607 | 0.0595 |
+| bootstrap p (1,000 sets) | 0.202, plausible | 0.036, rejected |
+| against exponential, R (p) | +2.628 (0.009) | +2.411 (0.016) |
+| against lognormal, R (p) | −1.007 (0.314) | −0.316 (0.752) |
+| against truncated power law, R (p) | +0.002 (0.997) | −0.328 (0.894) |
+
+R > 0 favors the power law. The largest cascade per order in the primary runs: sensory-motor betweenness 6,046, betweenness 182, weighted out-degree 41, weighted in-degree 27, PageRank 8, random 1.
+
+<sub>Source: <a href="results/avalanche_analysis.md">results/avalanche_analysis.md</a>, <a href="results/avalanche_analysis.json">results/avalanche_analysis.json</a></sub>
+
+</details>
 
 ## Explore the site
 
@@ -308,6 +379,27 @@ The live site is an illustrated version of everything above, with every removal 
 9. **Follow-up analyses.** Structural avalanches, fitted by maximum likelihood with a bootstrap goodness-of-fit test,[^clauset] brain and nerve cord subgraphs, synthetic-lethal pairs, bilateral redundancy, the hidden bottleneck and literature validation were pre-registered. The full single-type removal table, disconnection across the type population, regional and superclass removal, the structural profile, the edge attack and the published-threshold comparison were added afterwards and are exploratory.
 
 <details>
+<summary>Protocol settings</summary>
+
+| setting | value |
+|---|---|
+| edge threshold | at least 1% of the target type's input synapses; self-loops dropped |
+| batch size | 1% of the remaining types, rounded up; 69 batches to 50% removed |
+| scores | recomputed on the reduced graph before every batch; ties broken in seeded random order |
+| removal window | until at least 50% of types are removed; fragility is the AUC over that range |
+| critical fraction | first fall below 50% of intact flow, interpolated between batches |
+| random removal | 30 trials, mean with a Student-t 95% CI |
+| null model | 200 graphs, 10 × \|E\| degree-preserving swaps each, out-strength kept |
+| null test | one-sided empirical p per order, Bonferroni threshold 0.05 / 6 = 0.0083 |
+| cascade fit | discrete power law, bootstrap with 1,000 synthetic sets, plausible at p ≥ 0.1 |
+| seeds | base 20260915; null graph i: base + 100000 + i; trial t of order j, counting orders from 0: base + 1000 j + t |
+| exploratory analyses | 200 same-size random sets for regions and superclasses; edge attack in 1% batches of connections, 5 random orders |
+
+The edge threshold, batch rule, removal window, critical fraction, random trials, null model and its test, the cascade fit and the null-graph seeds were fixed in the pre-registration and not changed.
+
+</details>
+
+<details>
 <summary>Software</summary>
 
 | package | version |
@@ -355,7 +447,7 @@ make reproduce WORKERS=8   # data, analyze, validate, context, hero, export, pap
 make web                   # web/dist
 ```
 
-The stages can also be run on their own: `make data` (schema, sensory and motor sets, type graphs), `make analyze` (percolation, thresholds and every follow-up analysis), `make validate` (null model and literature validation), `make context` (published thresholds), `make hero` (regional impact, hero image, type atlas), `make export` (site data), `make paper`, `make poster`, `make test` (unit tests) and `make verify` (checks every committed result against its invariants). `make readme` redraws the figures on this page from `results/`, and `make captures` records the site animations from a running development server and a Chrome started with `--remote-debugging-port=9222`.
+The stages can also be run on their own: `make data` (schema, sensory and motor sets, type graphs), `make analyze` (percolation, thresholds and every follow-up analysis), `make validate` (null model and literature validation), `make context` (published thresholds), `make hero` (regional impact, hero image, type atlas), `make export` (site data), `make paper`, `make poster`, `make test` (unit tests) and `make verify` (checks every committed result against its invariants). `make readme` redraws the figures on this page from `results/`, setting their text as outlines in the site's typefaces, Source Serif 4 and Archivo (DejaVu where those font files are absent), and `make captures` records the site animations from a running development server and a Chrome started with `--remote-debugging-port=9222`.
 
 Raw neuPrint data are cached under `data/` and are not committed. The public dataset can be queried anonymously; set `NEUPRINT_APPLICATION_CREDENTIALS` to use a token. All randomness is seeded from 20260915, and every percolation run is cached as its own file, so an interrupted run resumes where it stopped.
 

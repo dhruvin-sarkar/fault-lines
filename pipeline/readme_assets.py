@@ -1,4 +1,8 @@
-"""Draw the README plates, figures and methods diagram as SVG, in light and dark variants, from the results."""
+"""Draw the README plates, figures and methods diagram as SVG, in light and dark variants, from the results.
+
+Text is set as glyph outlines in the site's typefaces, Source Serif 4 and Archivo, so every viewer renders the same
+shapes and widths. Each glyph is defined once per file and placed with ``<use>``.
+"""
 
 import argparse
 import json
@@ -6,12 +10,16 @@ import math
 import re
 from collections.abc import Callable, Iterable, Sequence
 from decimal import ROUND_HALF_UP, Decimal
+from functools import cache
 from html import escape
 from pathlib import Path
 
+import matplotlib
 import numpy as np
 import pandas as pd
-from scipy import stats
+from fontTools.pens.svgPathPen import SVGPathPen
+from fontTools.ttLib import TTFont
+from scipy import special, stats
 
 from pipeline.common import ASSETS, RESULTS
 from pipeline.figures import STRATEGY_COLORS
@@ -20,10 +28,19 @@ OUT_DIR = ASSETS / "readme"
 WIDTH = 1760
 MARGIN = 64
 
-SERIF = "Georgia, 'Times New Roman', Times, serif"
-# Georgia sets old-style figures; large numbers use faces with lining figures first.
-SERIF_NUMBERS = "'Palatino Linotype', Palatino, 'Book Antiqua', 'Iowan Old Style', Georgia, serif"
-SANS = "system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+# Serif text at or above this size uses the display optical size.
+DISPLAY_SIZE = 48
+# DejaVu ships with matplotlib; it stands in for a face that cannot be built and for glyphs a face lacks.
+FALLBACK_FILES = {
+    "display": "DejaVuSerif.ttf",
+    "serif": "DejaVuSerif.ttf",
+    "serif_bold": "DejaVuSerif-Bold.ttf",
+    "serif_italic": "DejaVuSerif-Italic.ttf",
+    "sans": "DejaVuSans.ttf",
+    "sans_medium": "DejaVuSans.ttf",
+    "sans_bold": "DejaVuSans-Bold.ttf",
+    "sans_italic": "DejaVuSans-Oblique.ttf",
+}
 
 THEMES = {
     "light": {
@@ -139,31 +156,134 @@ def num(value: float) -> str:
     return "0" if text in ("-0", "") else text
 
 
-_WIDE = set("MW@%mw")
-_NARROW = set("iljtfI.,:;'!|() ")
+# Typefaces.
+
+class Face:
+    """A static TrueType font read for glyph outlines, advance widths and pair kerning."""
+
+    def __init__(self, path: Path) -> None:
+        self.font = TTFont(path, lazy=True)
+        self.key = path.stem
+        self.upem = self.font["head"].unitsPerEm
+        self.cmap = self.font.getBestCmap()
+        self.glyphs = self.font.getGlyphSet()
+        self.metrics = self.font["hmtx"].metrics
+        self._pairs = pair_subtables(self.font)
+        self._kerning: dict[tuple[str, str], int] = {}
+
+    def glyph(self, ch: str) -> str | None:
+        return self.cmap.get(ord(ch))
+
+    def advance(self, glyph: str) -> int:
+        return self.metrics[glyph][0]
+
+    def kern(self, left: str, right: str) -> int:
+        """Horizontal adjustment between two glyphs from the first matching GPOS pair subtable, in font units."""
+        key = (left, right)
+        if key not in self._kerning:
+            self._kerning[key] = pair_adjustment(self._pairs, left, right)
+        return self._kerning[key]
+
+    def outline(self, glyph: str) -> str:
+        """SVG path data for ``glyph`` in font units, y up."""
+        pen = SVGPathPen(self.glyphs, ntos=lambda v: num(v))
+        self.glyphs[glyph].draw(pen)
+        return pen.getCommands()
 
 
-def text_width(s: str, size: float, bold: bool = False, serif: bool = False) -> float:
-    """Approximate rendered width of ``s`` in pixels for the system font stacks used here."""
-    width = 0.0
-    for ch in s:
-        if ch in _WIDE:
-            w = 0.82
-        elif ch in _NARROW:
-            w = 0.3
-        elif ch.isdigit():
-            w = 0.56
-        elif ch.isupper():
-            w = 0.66
-        else:
-            w = 0.52
-        width += w
-    width *= size
-    if bold:
-        width *= 1.06
+def pair_subtables(font: TTFont) -> list[tuple[object, dict[str, int]]]:
+    """Pair-positioning subtables of the 'kern' feature, each with its coverage as a glyph-to-index map."""
+    if "GPOS" not in font:
+        return []
+    table = font["GPOS"].table
+    indices = sorted({i for record in table.FeatureList.FeatureRecord if record.FeatureTag == "kern"
+                      for i in record.Feature.LookupListIndex})
+    found = []
+    for index in indices:
+        lookup = table.LookupList.Lookup[index]
+        for subtable in lookup.SubTable:
+            kind = subtable.ExtensionLookupType if lookup.LookupType == 9 else lookup.LookupType
+            subtable = getattr(subtable, "ExtSubTable", subtable)
+            if kind == 2:
+                found.append((subtable, {g: i for i, g in enumerate(subtable.Coverage.glyphs)}))
+    return found
+
+
+def pair_adjustment(subtables: Sequence[tuple[object, dict[str, int]]], left: str, right: str) -> int:
+    """X advance adjustment for the glyph pair, 0 when no subtable covers it."""
+    for subtable, coverage in subtables:
+        if left not in coverage:
+            continue
+        if subtable.Format == 1:
+            for record in subtable.PairSet[coverage[left]].PairValueRecord:
+                if record.SecondGlyph == right:
+                    return getattr(record.Value1, "XAdvance", None) or 0
+            continue
+        first = subtable.ClassDef1.classDefs.get(left, 0)
+        second = subtable.ClassDef2.classDefs.get(right, 0)
+        return getattr(subtable.Class1Record[first].Class2Record[second].Value1, "XAdvance", None) or 0
+    return 0
+
+
+@cache
+def faces() -> dict[str, tuple[Face, ...]]:
+    """Each text role's face followed by its DejaVu fallback."""
+    from pipeline.poster import build_fonts
+
+    built = build_fonts()
+    fallback_dir = Path(matplotlib.get_data_path()) / "fonts" / "ttf"
+    chains = {}
+    for role, fallback in FALLBACK_FILES.items():
+        chain = [Face(built[role])] if built.get(role) else []
+        chains[role] = tuple(chain + [Face(fallback_dir / fallback)])
+    return chains
+
+
+def role_for(size: float, weight: int = 400, serif: bool = False, italic: bool = False) -> str:
+    """Text role for a type size, weight, family and style."""
     if serif:
-        width *= 0.96
-    return width
+        if italic:
+            return "serif_italic"
+        if weight >= 600:
+            return "serif_bold"
+        return "display" if size >= DISPLAY_SIZE else "serif"
+    if italic:
+        return "sans_italic"
+    if weight >= 600:
+        return "sans_bold"
+    return "sans_medium" if weight >= 500 else "sans"
+
+
+def layout(s: str, size: float, role: str) -> tuple[list[tuple[Face, str, float]], float]:
+    """Glyphs of ``s`` with their x offsets in canvas units, kerned within a face, and the total advance."""
+    chain = faces()[role]
+    placed: list[tuple[Face, str, float]] = []
+    x = 0.0
+    previous: tuple[Face, str] | None = None
+    for ch in s:
+        face, glyph = next(((f, g) for f in chain if (g := f.glyph(ch))), (chain[-1], ".notdef"))
+        scale = size / face.upem
+        if previous and previous[0] is face:
+            x += face.kern(previous[1], glyph) * scale
+        placed.append((face, glyph, x))
+        x += face.advance(glyph) * scale
+        previous = (face, glyph)
+    return placed, x
+
+
+def face_groups(placed: Sequence[tuple[Face, str, float]]) -> list[tuple[Face, list[tuple[str, float]]]]:
+    """Consecutive glyphs that share a face, as (face, [(glyph, offset)]) groups."""
+    groups: list[tuple[Face, list[tuple[str, float]]]] = []
+    for face, glyph, offset in placed:
+        if not groups or groups[-1][0] is not face:
+            groups.append((face, []))
+        groups[-1][1].append((glyph, offset))
+    return groups
+
+
+def text_width(s: str, size: float, bold: bool = False, serif: bool = False, italic: bool = False) -> float:
+    """Rendered width of ``s`` in canvas units, measured from the glyph advances and kerning."""
+    return layout(s, size, role_for(size, 700 if bold else 400, serif, italic))[1]
 
 
 def wrap(s: str, size: float, max_width: float, bold: bool = False) -> list[str]:
@@ -208,11 +328,12 @@ def spread(positions: Sequence[float], gap: float, lo: float = -math.inf, hi: fl
     return result
 
 
-def italicize(markup: str, words: Sequence[str]) -> str:
-    """Wrap each occurrence of ``words`` in an italic tspan."""
-    for word in words:
-        markup = markup.replace(word, f'<tspan font-style="italic">{word}</tspan>')
-    return markup
+def italic_segments(s: str, words: Sequence[str]) -> list[tuple[str, bool]]:
+    """Split ``s`` into (text, italic) runs, with every occurrence of ``words`` italic."""
+    if not words:
+        return [(s, False)] if s else []
+    pattern = "(" + "|".join(re.escape(w) for w in words) + ")"
+    return [(part, part in words) for part in re.split(pattern, s) if part]
 
 
 def cluster_start(members: Sequence[float], gap: float) -> float:
@@ -276,6 +397,8 @@ class Svg:
         self.defs: list[str] = []
         self.style: list[str] = []
         self.parts: list[str] = []
+        self.glyph_ids: dict[tuple[str, str], str] = {}
+        self.glyph_defs: list[str] = []
 
     def c(self, name: str) -> str:
         """Resolve a theme token, a strategy id or a literal color."""
@@ -285,20 +408,46 @@ class Svg:
             return STRATEGY_INK[self.theme_name][name]
         return name
 
+    def glyph_ref(self, face: Face, glyph: str) -> str | None:
+        """Id of the shared definition of ``glyph``, added on first use; None for a glyph with no outline."""
+        key = (face.key, glyph)
+        if key not in self.glyph_ids:
+            outline = face.outline(glyph)
+            self.glyph_ids[key] = f"g{len(self.glyph_defs)}" if outline else ""
+            if outline:
+                self.glyph_defs.append(f'<path id="{self.glyph_ids[key]}" d="{outline}"/>')
+        return self.glyph_ids[key] or None
+
     def text(self, x: float, y: float, s: str, size: float = 26, color: str = "ink", weight: int = 400,
-             anchor: str = "start", serif: bool = False, italic: bool = False, extra: str = "",
-             numbers: bool = False, italic_words: Sequence[str] = ()) -> None:
-        """Place ``s`` with its baseline at ``y``; ``numbers`` picks the serif stack with lining figures."""
-        family = (SERIF_NUMBERS if numbers else SERIF) if serif else SANS
-        numeric = "lining-nums" if serif else "tabular-nums"
-        style = f' style="font-variant-numeric:{numeric}"'
-        attrs = f' font-weight="{weight}"' if weight != 400 else ""
-        attrs += ' font-style="italic"' if italic else ""
-        attrs += f' text-anchor="{anchor}"' if anchor != "start" else ""
-        self.parts.append(
-            f'<text x="{num(x)}" y="{num(y)}" font-family="{family}" font-size="{num(size)}" '
-            f'fill="{self.c(color)}"{attrs}{style}{extra}>{italicize(escape(s), italic_words)}</text>'
-        )
+             anchor: str = "start", serif: bool = False, italic: bool = False,
+             italic_words: Sequence[str] = ()) -> float:
+        """Set ``s`` as outlines with its baseline at ``y``; returns the width drawn."""
+        runs = [layout(part, size, role_for(size, weight, serif, italic or slanted))
+                for part, slanted in italic_segments(s, italic_words)]
+        width = sum(advance for _, advance in runs)
+        start = x - {"start": 0, "middle": width / 2, "end": width}[anchor]
+        for placed, advance in runs:
+            for face, glyphs in face_groups(placed):
+                self.glyph_group(face, glyphs, size, start, y, self.c(color))
+            start += advance
+        return width
+
+    def glyph_group(self, face: Face, glyphs: Sequence[tuple[str, float]], size: float, x: float, y: float,
+                    fill: str) -> None:
+        """One group of glyphs from a single face, scaled from font units and offset from the first glyph."""
+        scale = size / face.upem
+        first = glyphs[0][1]
+        uses = []
+        for glyph, offset in glyphs:
+            ref = self.glyph_ref(face, glyph)
+            if ref:
+                shift = round((offset - first) / scale)
+                uses.append(f'<use href="#{ref}"' + (f' x="{shift}"' if shift else "") + "/>")
+        if uses:
+            self.parts.append(
+                f'<g transform="matrix({scale:.6g} 0 0 {-scale:.6g} {num(x + first)} {num(y)})" '
+                f'fill="{fill}">{"".join(uses)}</g>'
+            )
 
     def line(self, x1: float, y1: float, x2: float, y2: float, color: str, width: float = 2,
              dash: str | None = None, opacity: float | None = None, cap: str | None = None) -> None:
@@ -311,10 +460,11 @@ class Svg:
         )
 
     def polyline(self, xs: Iterable[float], ys: Iterable[float], color: str, width: float = 3,
-                 dash: str | None = None) -> None:
+                 dash: str | None = None, opacity: float | None = None) -> None:
         points = list(zip(xs, ys))
         d = "M" + "L".join(f"{num(x)} {num(y)}" for x, y in points)
         extra = f' stroke-dasharray="{dash}"' if dash else ""
+        extra += f' stroke-opacity="{opacity}"' if opacity is not None else ""
         self.parts.append(
             f'<path d="{d}" stroke="{self.c(color)}" stroke-width="{num(width)}" fill="none" '
             f'stroke-linejoin="round" stroke-linecap="round"{extra}/>'
@@ -359,7 +509,8 @@ class Svg:
             f'<title id="t">{escape(title)}</title><desc id="d">{escape(desc)}</desc>'
         )
         style = f"<style>{''.join(self.style)}</style>" if self.style else ""
-        defs = f"<defs>{''.join(self.defs)}</defs>" if self.defs else ""
+        definitions = self.defs + self.glyph_defs
+        defs = f"<defs>{''.join(definitions)}</defs>" if definitions else ""
         if self.field:
             ground = f'<rect width="{WIDTH}" height="{self.height}" rx="16" fill="#000000"/>'
         elif self.theme["border"]:
@@ -395,6 +546,9 @@ def load_inputs(results: Path = RESULTS) -> dict:
         "superclasses": pd.read_csv(results / "superclass_impact.csv"),
         "compartments": read("brain_vnc_comparison.json"),
         "edges": read("edge_attack.json"),
+        "edge_curves": pd.read_csv(results / "edge_attack.csv"),
+        "bottleneck": read("hidden_bottleneck.json"),
+        "avalanches": read("avalanche_analysis.json"),
         "null_summary": read("null_model_summary.json") if null_summary.exists() else None,
     }
 
@@ -576,9 +730,9 @@ def stat_plate(data: dict, theme: str) -> tuple[str, str, str]:
         x = col[i % 2]
         y = tops[i // 2]
         svg.line(x, y, x + 768, y, "rule", 2)
-        svg.text(x, y + 200, big, 150, color, serif=True, numbers=True)
+        big_width = svg.text(x, y + 200, big, 150, color, serif=True)
         if small:
-            svg.text(x + 0.86 * text_width(big, 150) + 24, y + 200, small, 84, color, serif=True, numbers=True)
+            svg.text(x + big_width + 24, y + 200, small, 84, color, serif=True)
         for k, line in enumerate(label):
             svg.text(x, y + 276 + k * 58, line, 44, weight=700)
         for k, line in enumerate(sub):
@@ -890,7 +1044,8 @@ def figure_compartments(data: dict, theme: str) -> tuple[str, str, str]:
         svg.text(xa - 42, ly + 9, f"{STRATEGY_NAMES[strategy]}  {a:.3f}", 26, "ink", anchor="end")
         svg.text(xb + 42, ry + 9, f"{b:.3f}  {STRATEGY_NAMES[strategy]}", 26, "ink")
     welch = comp["welch_random_trials"]["auc_flow"]
-    note = (f"Under random removal the two do not differ significantly (Welch t = {welch['t']:.2f}, "
+    welch_t = f"{welch['t']:.2f}".replace("-", "−")
+    note = (f"Under random removal the two do not differ significantly (Welch t = {welch_t}, "
             f"p = {welch['p_value']:.2f}). The most damaging order differs: sensory-motor betweenness in the brain, "
             f"weighted in-degree in the nerve cord.")
     note_lines = wrap(note, 26, WIDTH - 2 * MARGIN)
@@ -904,9 +1059,348 @@ def figure_compartments(data: dict, theme: str) -> tuple[str, str, str]:
         f"Figure 5. Slope chart of flow-capacity AUC for each removal order in the brain-dominant subgraph "
         f"({count(brain['types'])} types) and the nerve cord-dominant subgraph ({count(vnc['types'])} types); lower is "
         f"more fragile. Brain: {listing(brain)}. Nerve cord: {listing(vnc)}. Under random removal they do not differ "
-        f"significantly (Welch t = {welch['t']:.2f}, p = {welch['p_value']:.2f}), but the most damaging order changes."
+        f"significantly (Welch t = {welch_t}, p = {welch['p_value']:.2f}), but the most damaging order changes."
     )
     return svg.render("Figure 5. Brain and nerve cord", desc), desc, f"fig-compartments-{theme}.svg"
+
+
+EDGE_ORDERS = {
+    "strongest": ("Strongest first", "ink", None),
+    "random": ("Random order", "random", None),
+    "weakest": ("Weakest first", "ink2", "2 9"),
+}
+
+
+def edge_runs(curves: pd.DataFrame, order: str) -> list[pd.DataFrame]:
+    """Every trial of one connection-removal order, sorted by fraction removed."""
+    rows = curves[curves["order"] == order]
+    return [rows[rows["trial"] == t].sort_values("fraction_removed") for t in sorted(rows["trial"].unique())]
+
+
+def figure_connections(data: dict, theme: str) -> tuple[str, str, str]:
+    """Figure 6: flow capacity and connected pairs as connections are removed by synapse count or at random."""
+    svg = Svg(1060, theme)
+    edges = data["edges"]
+    curves = data["edge_curves"]
+    intact_pairs = data["fragility"]["graph"]["intact_reachable_pairs"]
+    random_order = edges["orders"]["random"]
+    trials = len(random_order["critical_fraction_trials"])
+    heading(svg, 80, "Removing connections instead of cell types",
+            f"Batches of 1% of the {count(edges['edges'])} connections, ordered by synapse count. "
+            f"Random: trial 0 drawn, the other {trials - 1} trials faint.")
+
+    x = MARGIN
+    for order, (label, color, dash) in EDGE_ORDERS.items():
+        svg.line(x, 181, x + 44, 181, color, 4, dash=dash, cap="round")
+        x += 60 + svg.text(x + 58, 190, label, 26, "ink2") + 40
+
+    panels = [
+        (150, 770, "flow", edges["intact_flow"], "Flow capacity retained"),
+        (980, 1600, "reachable_pairs", intact_pairs, "Connected sensory-motor pairs retained"),
+    ]
+    py0, py1 = 290, 840
+    to_y = linear(0, 1, py1, py0)
+    ends: dict[str, dict[str, float]] = {}
+    for px0, px1, column, intact, title in panels:
+        to_x = linear(0, 0.5, px0, px1)
+        svg.text(px0 - 86, py0 - 36, title, 26, "ink2")
+        for v in (0.25, 0.5, 0.75, 1.0):
+            svg.line(px0, to_y(v), px1, to_y(v), "rule", 1)
+        for v in (0, 0.25, 0.5, 0.75, 1.0):
+            svg.line(px0 - 8, to_y(v), px0, to_y(v), "axis", 2)
+            svg.text(px0 - 16, to_y(v) + 9, pct(v, 0), 26, "ink2", anchor="end")
+        for v in (0, 0.1, 0.2, 0.3, 0.4, 0.5):
+            svg.line(to_x(v), py1, to_x(v), py1 + 8, "axis", 2)
+            svg.text(to_x(v), py1 + 38, pct(v, 0), 26, "ink2", anchor="middle")
+        svg.line(px0, py0, px0, py1, "axis", 2)
+        svg.line(px0, py1, px1, py1, "axis", 2)
+        svg.text((px0 + px1) / 2, py1 + 84, "Connections removed", 26, "ink2", anchor="middle")
+        if column == "flow":
+            svg.line(px0, to_y(0.5), px1, to_y(0.5), "signal", 2.5, dash="10 8")
+            svg.text(px0 + 16, to_y(0.5) - 14, "Half of intact flow", 24, "signal", 600)
+        for trial, run in enumerate(edge_runs(curves, "random")):
+            if trial:
+                svg.polyline([to_x(f) for f in run["fraction_removed"]], [to_y(v / intact) for v in run[column]],
+                             "random", 2, opacity=0.45)
+        for order, (_, color, dash) in reversed(EDGE_ORDERS.items()):
+            run = edge_runs(curves, order)[0]
+            svg.polyline([to_x(f) for f in run["fraction_removed"]], [to_y(v / intact) for v in run[column]],
+                         color, 3.5, dash=dash)
+            ends.setdefault(order, {})[column] = float(run[column].iloc[-1]) / intact
+        labels = spread([to_y(ends[o][column]) for o in EDGE_ORDERS], 34, py0, py1)
+        for order, ly in zip(EDGE_ORDERS, labels):
+            svg.text(px1 + 12, ly + 9, pct(ends[order][column]), 24, "ink", 700 if order == "strongest" else 400)
+        if column == "flow":
+            for trial_fc in random_order["critical_fraction_trials"]:
+                svg.line(to_x(trial_fc), to_y(0.5) - 14, to_x(trial_fc), to_y(0.5) + 14, "random", 2)
+            svg.dot(to_x(edges["orders"]["strongest"]["critical_fraction"]), to_y(0.5), 9, "ink", ring=3)
+            svg.dot(to_x(random_order["critical_fraction"]), to_y(0.5), 9, "random", ring=3)
+
+    strongest = edges["orders"]["strongest"]["critical_fraction"]
+    lo, hi = random_order["critical_fraction_range"]
+    note = (f"Flow halves after {pct(strongest)} of connections are removed strongest first, and after a mean of "
+            f"{pct(random_order['critical_fraction'])} in random order (ticks: {trials} trials, {pct(lo)} to "
+            f"{pct(hi)}). Weakest first never halves it, yet it disconnects more pairs than random removal.")
+    note_lines = wrap(note, 26, WIDTH - 2 * MARGIN)
+    for k, line in enumerate(note_lines):
+        svg.text(MARGIN, 1026 - (len(note_lines) - 1 - k) * 36, line, 26, "ink2")
+
+    desc = (
+        f"Figure 6. Two line charts over the first 50% of the {count(edges['edges'])} connections removed, in batches "
+        f"of 1%. Left, flow capacity retained: removing the connections with the most synapses first crosses half "
+        f"after {pct(strongest)} and ends at {pct(ends['strongest']['flow'])}; random order crosses half after a "
+        f"mean of {pct(random_order['critical_fraction'])} over {trials} trials, {pct(lo)} to {pct(hi)}, and trial 0 "
+        f"ends at {pct(ends['random']['flow'])}; weakest first never crosses half and ends at "
+        f"{pct(ends['weakest']['flow'])}. Right, connected sensory-motor pairs retained: strongest first ends at "
+        f"{pct(ends['strongest']['reachable_pairs'])}, weakest first at {pct(ends['weakest']['reachable_pairs'])} "
+        f"and random trial 0 at {pct(ends['random']['reachable_pairs'])}."
+    )
+    return svg.render("Figure 6. Removing connections", desc), desc, f"fig-connections-{theme}.svg"
+
+
+def figure_bottleneck(data: dict, theme: str) -> tuple[str, str, str]:
+    """Figure 7: the hidden-bottleneck candidates by percentile, and the wiring and removal cost of the first."""
+    svg = Svg(1250, theme)
+    bottleneck = data["bottleneck"]
+    criteria = bottleneck["criteria"]
+    candidates = bottleneck["candidates"]
+    ex = bottleneck["example"]
+    types = data["fragility"]["graph"]["cell_types"]
+    top_share = 100 - criteria["sm_betweenness_percentile_at_least"]
+    heading(svg, 80, "Unremarkable by partners and PageRank, near the top by sensory-motor betweenness",
+            f"Percentiles among {count(types)} types. Shaded: where a type must fall to qualify. Betweenness is drawn "
+            f"from {betweenness_floor(candidates, criteria)} to 100 so the candidates separate.")
+
+    floor = betweenness_floor(candidates, criteria)
+    measures = [
+        ("Degree", "degree_pct", (0, 100), criteria["degree_percentile_below"], True, 1),
+        ("PageRank", "pagerank_pct", (0, 100), criteria["pagerank_percentile_below"], True, 1),
+        ("Sensory-motor betweenness", "sm_betweenness_pct", (floor, 100),
+         criteria["sm_betweenness_percentile_at_least"], False, 2),
+    ]
+    first, pitch = 276, 64
+    columns = [(330, 690, 750), (820, 1180, 1240), (1310, 1600, WIDTH - MARGIN)]
+    bottom = first + pitch * (len(candidates) - 1) + 30
+    for i, candidate in enumerate(candidates):
+        y = first + i * pitch
+        lead = candidate["cell_type"] == ex["cell_type"]
+        svg.text(MARGIN, y + 4, candidate["cell_type"], 28, weight=700 if lead else 400)
+        svg.text(MARGIN, y + 28, SUPERCLASS_NAMES[candidate["superclass"]].lower(), 18, "ink3")
+    for (title, key, (d0, d1), cut, below, digits), (ax0, ax1, value_x) in zip(measures, columns):
+        to_x = linear(d0, d1, ax0, ax1)
+        zone = (ax0, to_x(cut)) if below else (to_x(cut), ax1)
+        svg.rect(zone[0], first - 34, zone[1] - zone[0], bottom - first + 34, "track")
+        svg.line(to_x(cut), first - 34, to_x(cut), bottom, "axis", 2, dash="6 5")
+        svg.text(ax0, first - 56, title, 24, "ink2", 700)
+        for i, candidate in enumerate(candidates):
+            y = first + i * pitch
+            lead = candidate["cell_type"] == ex["cell_type"]
+            svg.line(ax0, y, ax1, y, "rule", 1.5)
+            svg.dot(to_x(candidate[key]), y, 10 if lead else 8, "ink" if lead else "ink2", ring=3)
+            svg.text(value_x, y + 8, f"{candidate[key]:.{digits}f}", 22, "ink" if lead else "ink2",
+                     700 if lead else 400, anchor="end")
+        svg.line(ax0, bottom, ax1, bottom, "axis", 2)
+        for tick in (d0, cut, d1):
+            svg.line(to_x(tick), bottom, to_x(tick), bottom + 8, "axis", 2)
+            svg.text(to_x(tick), bottom + 36, f"{tick:g}", 22, "ink2", anchor="middle")
+
+    # The wiring around the first candidate, line width proportional to synapses.
+    top = 620
+    svg.line(MARGIN, top - 44, WIDTH - MARGIN, top - 44, "rule", 2)
+    svg.text(MARGIN, top, f"{ex['cell_type']}, {ex['n_neurons']} neurons: its five strongest inputs and outputs", 28,
+             weight=700)
+    heaviest = max(p["synapses"] for p in ex["strongest_inputs"] + ex["strongest_outputs"])
+    node_x, node_y, row = 880, top + 190, 52
+    svg.circle(node_x, node_y, 46, "signal")
+    svg.text(node_x, node_y + 9, ex["cell_type"], 24, "#ffffff", 700, anchor="middle")
+    for side, partners, text_x, anchor in ((-1, ex["strongest_inputs"], 470, "end"),
+                                           (1, ex["strongest_outputs"], 1290, "start")):
+        for k, partner in enumerate(partners):
+            y = node_y + (k - 2) * row
+            x0 = node_x + side * 46
+            x1 = text_x + side * -16
+            width = 2 + 14 * partner["synapses"] / heaviest
+            svg.raw(
+                f'<path d="M{num(x1)} {num(y)}C{num((x0 + x1) / 2)} {num(y)} {num((x0 + x1) / 2)} {num(node_y)} '
+                f'{num(x0)} {num(node_y)}" fill="none" stroke="{svg.c("rule_strong")}" '
+                f'stroke-width="{num(width)}"/>'
+            )
+            name = f"{partner['cell_type']}  {count(partner['synapses'])}"
+            svg.text(text_x, y + 8, name, 24, "ink", anchor=anchor)
+            kind = SUPERCLASS_NAMES.get(partner["superclass"], partner["superclass"]).lower()
+            svg.text(text_x, y + 32, kind, 18, "ink3", anchor=anchor)
+    svg.text(470, top + 56, "Inputs, synapses", 22, "ink3", anchor="end")
+    svg.text(1290, top + 56, "Outputs, synapses", 22, "ink3")
+
+    lost = ex["intact_flow"] - ex["flow_after_removal"]
+    cells = [
+        (f"{count(lost)}", f"of {count(ex['intact_flow'])} routes lost when {ex['cell_type']} alone is removed"),
+        (count(ex["pairs_lost_when_removed"]), f"of {count(ex['reachable_pairs'])} sensory-motor pairs disconnected"),
+        (count(ex["pairs_with_longer_shortest_path_when_removed"]), "pairs whose shortest route gets longer"),
+        (ordinal(ex["sm_betweenness_rank"]), f"of {count(types)} by sensory-motor betweenness, "
+                                           f"{pct(ex['share_of_shortest_routes'], 2)} of shortest routes"),
+    ]
+    cell_w = (WIDTH - 2 * MARGIN) / len(cells)
+    for i, (big, label) in enumerate(cells):
+        x = MARGIN + i * cell_w
+        svg.text(x, top + 490, big, 72, serif=True)
+        for k, line in enumerate(wrap(label, 24, cell_w - 40)):
+            svg.text(x, top + 530 + k * 32, line, 24, "ink2")
+
+    listing = "; ".join(
+        f"{c['cell_type']}, degree percentile {c['degree_pct']:.1f}, PageRank {c['pagerank_pct']:.1f}, sensory-motor "
+        f"betweenness {c['sm_betweenness_pct']:.2f}" for c in candidates
+    )
+    inputs = ", ".join(f"{p['cell_type']} {count(p['synapses'])}" for p in ex["strongest_inputs"])
+    outputs = ", ".join(f"{p['cell_type']} {count(p['synapses'])}" for p in ex["strongest_outputs"])
+    sensory_inputs = ("all sensory" if all(p["superclass"].endswith("sensory") for p in ex["strongest_inputs"])
+                      else "not all sensory")
+    desc = (
+        f"Figure 7. Top: {len(candidates)} cell types in the bottom half by degree and by PageRank but in the top "
+        f"{top_share:g}% by sensory-motor betweenness, as dots on percentile tracks: {listing}. Bottom: "
+        f"{ex['cell_type']}, a type of {ex['n_neurons']} neurons, with its five strongest inputs ({inputs} synapses), "
+        f"{sensory_inputs}, and five strongest outputs ({outputs}). Removing it alone loses {count(lost)} of "
+        f"{count(ex['intact_flow'])} routes and disconnects {count(ex['pairs_lost_when_removed'])} pairs, but "
+        f"{count(ex['pairs_with_longer_shortest_path_when_removed'])} pairs take a longer shortest route. It ranks "
+        f"{ordinal(ex['sm_betweenness_rank'])} of {count(types)} by sensory-motor betweenness."
+    )
+    return svg.render("Figure 7. A hidden bottleneck", desc), desc, f"fig-bottleneck-{theme}.svg"
+
+
+def ordinal(n: int) -> str:
+    """English ordinal, e.g. 21 -> '21st'."""
+    suffix = "th" if 11 <= n % 100 <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def betweenness_floor(candidates: Sequence[dict], criteria: dict) -> int:
+    """Lower end of the betweenness percentile axis: one below the lowest candidate or the cut, whichever is lower."""
+    low = min([criteria["sm_betweenness_percentile_at_least"]] + [c["sm_betweenness_pct"] for c in candidates])
+    return max(0, math.floor(low) - 1)
+
+
+def avalanche_sizes(curves: pd.DataFrame, runs: Iterable[tuple[str, int]]) -> np.ndarray:
+    """Cascade sizes of the batches within the first 50% of removals, pooled over (strategy, trial) runs."""
+    pooled = []
+    for strategy, trial in runs:
+        run = curve(curves, strategy, trial)
+        window = int(np.argmax(run["fraction_removed"].to_numpy() >= 0.5)) + 1
+        pooled.append(run["avalanche"].to_numpy()[1:window].astype(int))
+    return np.concatenate(pooled)
+
+
+def power_law_ccdf(x: np.ndarray, alpha: float, xmin: float) -> np.ndarray:
+    """P(X >= x | X >= xmin) for the discrete power law, from Hurwitz zeta functions."""
+    return special.zeta(alpha, x) / special.zeta(alpha, xmin)
+
+
+def figure_avalanches(data: dict, theme: str) -> tuple[str, str, str]:
+    """Figure 8: cascade-size CCDFs in both poolings with their fitted power laws, and the fit statistics."""
+    svg = Svg(900, theme)
+    fits = data["avalanches"]
+    curves = data["curves"]
+    targeted = [s for s in data["thresholds"]["strategies"] if s != "random"]
+    random_trials_n = int(curves.loc[curves["strategy"] == "random", "trial"].nunique())
+    sets = [
+        ("Primary", "primary", [(s, 0) for s in ["random", *targeted]], "signal", False),
+        ("Sensitivity", "sensitivity_all_random_trials",
+         [(s, 0) for s in targeted] + [("random", t) for t in range(random_trials_n)], "ink2", True),
+    ]
+    heading(svg, 80, "Cascade sizes are not established as scale-free",
+            "Cell types newly cut off from sensory input by one removal batch, within the first 50% of removals.")
+
+    px0, px1, py0, py1 = 170, 900, 214, 740
+    to_x = linear(0, 4, px0, px1)
+    to_y = linear(-3, 0, py1, py0)
+    for e in range(0, 5):
+        svg.line(to_x(e), py1, to_x(e), py1 + 8, "axis", 2)
+        svg.text(to_x(e), py1 + 38, count(10 ** e), 24, "ink2", anchor="middle")
+    for e, label in ((0, "100%"), (-1, "10%"), (-2, "1%"), (-3, "0.1%")):
+        svg.line(px0, to_y(e), px1, to_y(e), "rule", 1)
+        svg.line(px0 - 8, to_y(e), px0, to_y(e), "axis", 2)
+        svg.text(px0 - 16, to_y(e) + 9, label, 24, "ink2", anchor="end")
+    svg.line(px0, py0, px0, py1, "axis", 2)
+    svg.line(px0, py1, px1, py1, "axis", 2)
+    svg.text((px0 + px1) / 2, py1 + 82, "Cascade size, cell types", 26, "ink2", anchor="middle")
+    svg.text(MARGIN, 190, "Share of cascades at least this size", 26, "ink2")
+
+    for name, key, runs, color, hollow in reversed(sets):
+        fit = fits[key]
+        sizes = avalanche_sizes(curves, runs)
+        positive = np.sort(sizes[sizes > 0])
+        checks = (len(sizes), int((sizes == 0).sum()), len(positive), int((positive >= fit["xmin"]).sum()),
+                  int(positive.max()))
+        expected = (fit["batches"], fit["zero_size"], fit["fitted"], fit["n_tail"], fit["max_size"])
+        if checks != expected:
+            raise ValueError(f"{key}: cascade sizes {checks} do not match avalanche_analysis.json {expected}")
+        values = np.unique(positive)
+        share = 1 - np.searchsorted(positive, values, side="left") / len(positive)
+        xs = np.geomspace(fit["xmin"], positive.max(), 60)
+        model = fit["n_tail"] / fit["fitted"] * power_law_ccdf(xs, fit["alpha"], fit["xmin"])
+        xs, model = xs[model >= 1e-3], model[model >= 1e-3]
+        svg.polyline([to_x(math.log10(v)) for v in xs], [to_y(math.log10(v)) for v in model], color, 3, dash="12 8")
+        for v, s in zip(values, share):
+            svg.dot(to_x(math.log10(v)), to_y(math.log10(s)), 7, color, hollow=hollow)
+
+    lx = 560
+    svg.dot(lx, 250, 7, "signal")
+    svg.text(lx + 20, 259, "Primary: one run per order", 24, "ink2")
+    svg.dot(lx, 290, 7, "ink2", hollow=True)
+    svg.text(lx + 20, 299, f"Sensitivity: all {random_trials_n} random trials", 24, "ink2")
+    svg.line(lx - 12, 330, lx + 12, 330, "ink2", 3, dash="8 5")
+    svg.text(lx + 20, 339, "Fitted power law, over the sizes it fits", 24, "ink2")
+
+    tx0, col_a, col_b = 1000, 1480, WIDTH - MARGIN
+    svg.text(col_a, 214, "Primary", 24, "ink3", 700, anchor="end")
+    svg.text(col_b, 214, "Sensitivity", 24, "ink3", 700, anchor="end")
+    svg.line(tx0, 232, col_b, 232, "rule", 2)
+    primary, sensitivity = fits["primary"], fits["sensitivity_all_random_trials"]
+
+    def lr(r: dict, alternative: str) -> str:
+        c = r["comparisons"][alternative]
+        return f"{c['loglikelihood_ratio']:+.3f} ({c['p_value']:.3f})".replace("-", "−")
+
+    rows = [
+        ("Batches, positive sizes", f"{primary['batches']}, {primary['fitted']}",
+         f"{count(sensitivity['batches'])}, {sensitivity['fitted']}"),
+        ("Exponent", f"{primary['alpha']:.3f} ± {primary['alpha_se']:.3f}",
+         f"{sensitivity['alpha']:.3f} ± {sensitivity['alpha_se']:.3f}"),
+        ("Fitted from size", f"{primary['xmin']:g} ({primary['n_tail']} sizes)",
+         f"{sensitivity['xmin']:g} ({sensitivity['n_tail']} sizes)"),
+        ("Bootstrap p", f"{primary['bootstrap_p']:.3f}", f"{sensitivity['bootstrap_p']:.3f}"),
+        ("Power law", "plausible" if primary["power_law_plausible"] else "rejected",
+         "plausible" if sensitivity["power_law_plausible"] else "rejected"),
+        ("Against lognormal, R (p)", lr(primary, "lognormal"), lr(sensitivity, "lognormal")),
+        ("Against exponential, R (p)", lr(primary, "exponential"), lr(sensitivity, "exponential")),
+    ]
+    for i, (label, a, b) in enumerate(rows):
+        y = 284 + i * 56
+        verdict = label == "Power law"
+        svg.text(tx0, y, label, 24, "ink2")
+        for value, x, result in ((a, col_a, primary), (b, col_b, sensitivity)):
+            rejected = verdict and not result["power_law_plausible"]
+            svg.text(x, y, value, 24, "signal" if rejected else "ink", 700 if verdict else 400, anchor="end")
+        svg.line(tx0, y + 22, col_b, y + 22, "rule", 1)
+    note = ("A power law counts as plausible at bootstrap p of 0.1 or more. It passes in one pooling and fails in the "
+            "other, and a lognormal cannot be told apart in either. R above 0 favors the power law.")
+    for k, line in enumerate(wrap(note, 24, col_b - tx0)):
+        svg.text(tx0, 700 + k * 34, line, 24, "ink2")
+    svg.text(MARGIN, 862, f"The largest cascade, {count(primary['max_size'])} types, comes from a single sensory-motor "
+                          "betweenness batch.", 24, "ink3")
+
+    desc = (
+        f"Figure 8. Log-log plot of the share of structural cascades at least a given size, for the primary pooling of "
+        f"one run per removal order ({primary['fitted']} positive sizes) and the sensitivity pooling with all "
+        f"{random_trials_n} random trials ({sensitivity['fitted']} positive sizes), each with its fitted discrete power "
+        f"law. Primary: exponent {primary['alpha']:.3f} above size {primary['xmin']:g}, bootstrap p = "
+        f"{primary['bootstrap_p']:.3f}, plausible. Sensitivity: exponent {sensitivity['alpha']:.3f} above size "
+        f"{sensitivity['xmin']:g}, bootstrap p = {sensitivity['bootstrap_p']:.3f}, rejected. Against a lognormal the "
+        f"likelihood ratio is not significant in either pooling (p = "
+        f"{primary['comparisons']['lognormal']['p_value']:.3f} and "
+        f"{sensitivity['comparisons']['lognormal']['p_value']:.3f}). The largest cascade is "
+        f"{count(primary['max_size'])} types."
+    )
+    return svg.render("Figure 8. Cascade sizes", desc), desc, f"fig-avalanches-{theme}.svg"
 
 
 def methods_pipeline(data: dict, theme: str) -> tuple[str, str, str]:
@@ -954,11 +1448,11 @@ def methods_pipeline(data: dict, theme: str) -> tuple[str, str, str]:
     for k, (title, value, module) in enumerate(steps):
         x, y = xs[k % 4], ys[k // 4]
         svg.rect(x, y, box_w, box_h, "plate", rx=11, stroke="rule")
-        svg.text(x + 22, y + 52, str(k + 1), 34, "ink3", serif=True, numbers=True)
+        svg.text(x + 22, y + 52, str(k + 1), 34, "ink3", serif=True)
         svg.text(x + 56, y + 52, title, 26, weight=700)
         if title == "Null model" and not null_done:
             svg.text(x + box_w - 22, y + 52, "computing", 20, "signal", 600, anchor="end")
-        svg.text(x + 22, y + 116, value, 28, serif=True, numbers=True)
+        svg.text(x + 22, y + 116, value, 28, serif=True)
         svg.text(x + 22, y + 170, module, 20, "ink2")
     status = "complete" if null_done else "still computing"
     desc = (
@@ -974,7 +1468,7 @@ def methods_pipeline(data: dict, theme: str) -> tuple[str, str, str]:
 
 
 THEMED = (stat_plate, figure_curves, figure_thresholds, figure_regions, figure_classes, figure_compartments,
-          methods_pipeline)
+          figure_connections, figure_bottleneck, figure_avalanches, methods_pipeline)
 
 
 def build_all(data: dict, out_dir: Path) -> list[Path]:
