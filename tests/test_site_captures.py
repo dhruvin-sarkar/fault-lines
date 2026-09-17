@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 from PIL import Image
 
@@ -103,6 +104,60 @@ def test_save_gif_frames_decode_to_their_source(tmp_path):
         for i, frame in enumerate(frames):
             gif.seek(i)
             assert sc.same_frame(gif.convert("RGB"), frame)
+
+
+def test_shared_palette_keeps_a_small_mark_the_octree_merges():
+    y, x = np.mgrid[0:120, 0:240]
+    frame = np.stack([x * 255 // 239, y * 255 // 119, 255 - x * 255 // 239], axis=2).astype(np.uint8)
+    frame[4:10, 4:10] = (178, 75, 116)
+    image = Image.fromarray(frame)
+
+    def mark(palette):
+        return image.quantize(palette=palette, dither=Image.Dither.NONE).convert("RGB").getpixel((6, 6))
+
+    merged = mark(sc.shared_palette([image], 64, reserve=0))
+    assert max(abs(a - b) for a, b in zip(merged, (178, 75, 116))) > 12
+    assert mark(sc.shared_palette([image], 64)) == (178, 75, 116)
+
+
+def test_shared_palette_pads_unused_slots_with_the_first_entry():
+    frames = [Image.new("RGB", (8, 8), (30, 60, 90)), Image.new("RGB", (8, 8), (200, 10, 10))]
+    table = sc.shared_palette(frames, 255).getpalette()
+    assert len(table) == 768
+    assert table[-3:] == table[:3]
+
+
+def test_scroll_stops_ease_to_the_end_and_split_wide_jumps():
+    stops = sc.scroll_stops(0, 330, 18)
+    assert stops == [2, 6, 14, 28, 49, 63, 78, 97, 116, 140, 165, 189, 214, 233, 252, 266, 281, 302, 316, 324, 328, 330]
+    unsplit = [0, 2, 6, 14, 28, 49, 78, 116, 165, 214, 252, 281, 302, 316, 324, 328, 330]
+    assert all(b - a <= 24 or (a + b) // 2 in stops for a, b in zip(unsplit, unsplit[1:]))
+    assert sc.scroll_stops(816, 330, 4)[-1] == 330
+
+
+def test_lookup_plan_types_then_scrolls_to_each_stop():
+    panel = {"left": 34, "top": 100, "right": 991, "bottom": 1787}
+    plan = sc.lookup_plan("ALIN7", panel)
+    names = [name for name, _ in plan["frames"]]
+    assert plan["output"] == "lookup-alin7.gif"
+    assert names[:9] == ["l00_start.png", "l01_focus.png", "l02_type1.png", "l03_type2.png", "l04_type3.png",
+                         "l05_type4.png", "l06_type5.png", "l07_highlight.png", "l08_profile.png"]
+    held = {name.split("_", 1)[1]: ms for name, ms in plan["frames"]}
+    for stop, _, hold in sc.LOOKUP_STOPS:
+        assert held[f"scroll{stop:03d}.png"] == hold
+    assert len(held) == len(names)
+    assert plan["bands"] == [[18, sc.LOOKUP_TOP - 12, 1007, sc.LOOKUP_TOP + sc.LOOKUP_HEIGHT - 12]]
+
+
+def test_race_plan_holds_the_ends_and_the_pinned_attack():
+    plan = sc.race_plan(69, {"left": 72, "top": 104, "right": 1193, "bottom": 154}, {"bottom": 1005})
+    frames = plan["frames"]
+    assert len(frames) == 71
+    assert frames[0] == ["f00.png", sc.RACE_START_MS]
+    assert frames[1] == ["f01.png", sc.RACE_STEP_MS]
+    assert frames[69] == ["f69.png", sc.RACE_END_MS]
+    assert frames[70] == ["focus.png", sc.RACE_FOCUS_MS]
+    assert plan["bands"] == [[56, 88, 1209, 1017]]
 
 
 def test_save_gif_rejects_a_full_palette(tmp_path):

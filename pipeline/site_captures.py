@@ -10,7 +10,9 @@ import argparse
 import base64
 import hashlib
 import json
+import math
 import os
+import re
 import socket
 import struct
 import time
@@ -29,6 +31,7 @@ FRAMES_DIR = DATA / "captures"
 SITE = "http://localhost:4173/fault-lines/"
 DEVTOOLS = "http://127.0.0.1:9222"
 DESKTOP = (1280, 1400)
+LOOKUP_VIEW = (1040, 1000)
 PHONE = (390, 844)
 SCALE = 2
 GIF_WIDTH = 1320
@@ -39,6 +42,21 @@ STRIP_MARGIN = 48
 FIELD = (0, 0, 0)
 STRIP_FIELD = (52, 54, 58)
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+# Race timing in milliseconds, and the attack pinned once the race has finished.
+RACE_START_MS = 1200
+RACE_STEP_MS = 110
+RACE_END_MS = 1800
+RACE_FOCUS_MS = 3000
+RACE_FOCUS = "Weighted out-degree"
+
+# The lookup map is sticky 76px from the top, just under the site header; the crop starts 12px above it.
+LOOKUP_TOP = 76
+LOOKUP_HEIGHT = 900
+LOOKUP_SCROLL_MS = 40
+# Resting scroll offsets in CSS pixels, with the frames spent reaching each and how long it holds: the removal
+# panel in full, then the strategy timing chart.
+LOOKUP_STOPS = ((330, 18, 2800), (816, 24, 3600))
 
 
 # WebSocket framing (RFC 6455), enough for a DevTools session.
@@ -257,14 +275,33 @@ SHIELD_JS = """() => {
   return true;
 }"""
 
-RACE_SEEK_JS = """async (step) => {
+# Moves the race scrubber with a key (Home, ArrowRight) and waits for the transitions and staggered maps to settle.
+# While stepping mid-race the button is given the pause icon it shows during playback.
+RACE_KEY_JS = """async ([key, playing]) => {
   const input = document.querySelector('#collapse-race .race-scrub input');
-  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
   document.activeElement && document.activeElement.blur();
-  setValue.call(input, String(step));
-  input.dispatchEvent(new Event('input', {bubbles: true}));
-  await new Promise((r) => setTimeout(r, 450));
-  return Number(input.value);
+  input.dispatchEvent(new KeyboardEvent('keydown', {key, bubbles: true, cancelable: true}));
+  await new Promise((r) => setTimeout(r, 520));
+  const paths = document.querySelectorAll('#collapse-race .race-play svg path');
+  if (playing && paths.length === 1) paths[0].setAttribute('d', 'M3 2h3v10H3zM8 2h3v10H8z');
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  return input.getAttribute('aria-valuetext');
+}"""
+
+RACE_PIN_JS = """async (name) => {
+  const cell = [...document.querySelectorAll('#collapse-race .race-map')]
+    .find((li) => li.querySelector('.race-map-name').textContent.trim() === name);
+  cell.click();
+  document.activeElement && document.activeElement.blur();
+  await new Promise((r) => setTimeout(r, 700));
+  return cell.classList.contains('is-focus');
+}"""
+
+HIDE_CARET_JS = """() => {
+  const style = document.createElement('style');
+  style.textContent = '#lookup-input { caret-color: transparent; }';
+  document.head.appendChild(style);
+  return true;
 }"""
 
 # Clicks the busiest-type button and freezes the transitions it starts, so they can be sampled at fixed times.
@@ -302,26 +339,54 @@ def band(rect: dict, x_pad: float, top_pad: float, bottom_pad: float) -> list[in
             int(np.ceil(rect["bottom"] + bottom_pad))]
 
 
+def scroll_stops(start: int, end: int, frames: int, split: int = 24) -> list[int]:
+    """Scroll offsets from ``start`` to ``end`` eased in and out over ``frames`` steps.
+
+    Repeated offsets are dropped, and a midpoint is added across any jump wider than ``split`` pixels so the fastest
+    part of the scroll stays smooth. The list ends at ``end`` and excludes ``start``.
+    """
+    stops, last = [], start
+    for i in range(1, frames + 1):
+        t = i / frames
+        eased = 4 * t**3 if t < 0.5 else 1 - (2 - 2 * t) ** 3 / 2
+        offset = math.floor(start + (end - start) * eased + 0.5)
+        if offset == last:
+            continue
+        if abs(offset - last) > split:
+            stops.append((last + offset) // 2)
+        stops.append(offset)
+        last = offset
+    return stops
+
+
 # Recorders. Each saves full-viewport screenshots into ``folder`` and writes the plan that assembles them.
 
+def race_plan(steps: int, head: dict, maps: dict) -> dict:
+    """Plan for the race: steps 0 to ``steps``, then one attack pinned, cropped from the figure head to the maps."""
+    frames = [[f"f{step:02d}.png", RACE_START_MS if step == 0 else RACE_END_MS if step == steps else RACE_STEP_MS]
+              for step in range(steps + 1)]
+    frames.append(["focus.png", RACE_FOCUS_MS])
+    box = band({**head, "bottom": maps["bottom"]}, 16, 16, 12)
+    return {"output": "collapse-race.gif", "scale": SCALE, "bands": [box], "frames": frames}
+
+
 def record_collapse(tab: Tab, folder: Path, site: str) -> None:
-    """Every removal step of the race, reached through its slider, with the maps below the chart."""
+    """Every removal step of the race, reached with the scrubber's arrow key, then one attack pinned from its map."""
     tab.resize(*DESKTOP)
     tab.open(site + "#collapse", "document.querySelector('#collapse-race .race-scrub input')")
     tab.scroll_to("#collapse-race", 72)
     tab.evaluate(call_js(SHIELD_JS))
-    last = int(tab.evaluate("Number(document.querySelector('#collapse-race .race-scrub input').max)"))
-    frames = []
-    for step in range(last + 1):
-        tab.evaluate(call_js(RACE_SEEK_JS, step))
-        name = f"f{step:02d}.png"
-        tab.save_shot(folder / name)
-        frames.append([name, 1400 if step == 0 else 3200 if step == last else 130])
-    figure, scrub = tab.rect("#collapse-race"), tab.rect("#collapse-race .race-scrub")
-    head, maps = tab.rect("#collapse-race .race-multiples-head"), tab.rect("#collapse-race .race-multiples")
-    chart = band({**figure, "bottom": scrub["bottom"]}, 0, -16, 0)
-    grid = band({**figure, "top": head["top"], "bottom": maps["bottom"]}, 0, 13, 12)
-    write_plan(folder, {"output": "collapse-race.gif", "scale": SCALE, "bands": [chart, grid], "frames": frames})
+    tab.evaluate(call_js(RACE_KEY_JS, ["Home", False]))
+    tab.save_shot(folder / "f00.png")
+    step, total = 0, None
+    while step != total:
+        text = tab.evaluate(call_js(RACE_KEY_JS, ["ArrowRight", True]))
+        step, total = (int(v) for v in re.match(r"Step (\d+) of (\d+)", text).groups())
+        tab.save_shot(folder / f"f{step:02d}.png")
+    tab.evaluate(call_js(RACE_PIN_JS, RACE_FOCUS))
+    tab.save_shot(folder / "focus.png")
+    plan = race_plan(step, tab.rect("#collapse-race .figure-head"), tab.rect("#collapse-race .race-maps"))
+    write_plan(folder, plan)
 
 
 def record_measure(tab: Tab, folder: Path, site: str, samples: Sequence[int] = (0, 90, 180)) -> None:
@@ -349,36 +414,55 @@ def record_measure(tab: Tab, folder: Path, site: str, samples: Sequence[int] = (
     write_plan(folder, {"output": "measure-routes.gif", "scale": SCALE, "bands": [box], "frames": frames})
 
 
+def lookup_scenes(name: str) -> list[tuple[str, int, int | None]]:
+    """(label, duration in ms, scroll offset or None) for each lookup frame, in order.
+
+    Typing ``name`` letter by letter, highlighting and choosing it, then scrolling the profile down to its removal
+    panel and its strategy timing chart.
+    """
+    scenes = [("start", 1200, None), ("focus", 400, None)]
+    scenes += [(f"type{i + 1}", 600 if i == len(name) - 1 else 200, None) for i in range(len(name))]
+    scenes += [("highlight", 800, None), ("profile", 2200, None)]
+    offset = 0
+    for stop, steps, hold in LOOKUP_STOPS:
+        scenes += [(f"scroll{y:03d}", hold if y == stop else LOOKUP_SCROLL_MS, y)
+                   for y in scroll_stops(offset, stop, steps)]
+        offset = stop
+    return scenes
+
+
+def lookup_plan(name: str, panel: dict) -> dict:
+    """Plan for the lookup: every scene in order, cropped to ``panel`` below the site header."""
+    frames = [[f"l{i:02d}_{label}.png", ms] for i, (label, ms, _) in enumerate(lookup_scenes(name))]
+    box = band({**panel, "top": LOOKUP_TOP, "bottom": LOOKUP_TOP + LOOKUP_HEIGHT - 12}, 16, 12, 0)
+    return {"output": f"lookup-{name.lower()}.gif", "scale": SCALE, "bands": [box], "frames": frames}
+
+
 def record_lookup(tab: Tab, folder: Path, site: str, name: str = "ALIN7") -> None:
-    """Typing a cell type name, choosing it from the list and reading its profile and map."""
-    tab.resize(*DESKTOP)
+    """Typing a cell type name, choosing it from the list and scrolling through its profile beside the map."""
+    tab.resize(*LOOKUP_VIEW)
     tab.open(site + "#lookup", "document.querySelector('#lookup-input')")
-    tab.scroll_to("#lookup .fc-lookup", 150)
+    base = tab.scroll_to("#lookup .fc-lookup", LOOKUP_TOP)
+    panel = tab.rect("#lookup .fc-lookup")
     tab.evaluate(call_js(SHIELD_JS))
-    frames = []
-
-    def shot(label: str, ms: int) -> None:
-        file = f"l{len(frames):02d}_{label}.png"
-        tab.save_shot(folder / file)
-        frames.append([file, ms])
-
-    shot("start", 1200)
-    tab.evaluate("document.querySelector('#lookup-input').focus({preventScroll: true}) || true")
-    time.sleep(0.3)
-    shot("focus", 400)
-    for i, ch in enumerate(name):
-        tab.insert_text(ch)
-        time.sleep(0.25)
-        shot(f"type{i + 1}", 600 if i == len(name) - 1 else 220)
-    tab.press("ArrowDown", 40)
-    time.sleep(0.25)
-    shot("highlight", 900)
-    tab.press("Enter", 13)
-    time.sleep(1.2)
-    tab.scroll_to("#lookup .fc-lookup", 150)
-    shot("profile", 4000)
-    box = band(tab.rect("#lookup .fc-lookup"), 24, 28, 20)
-    write_plan(folder, {"output": f"lookup-{name.lower()}.gif", "scale": SCALE, "bands": [box], "frames": frames})
+    tab.evaluate(call_js(HIDE_CARET_JS))
+    typed = iter(name)
+    for i, (label, _, offset) in enumerate(lookup_scenes(name)):
+        if label == "focus":
+            tab.evaluate("document.querySelector('#lookup-input').focus({preventScroll: true}) || true")
+        elif label.startswith("type"):
+            tab.insert_text(next(typed))
+        elif label == "highlight":
+            tab.press("ArrowDown", 40)
+        elif label == "profile":
+            tab.press("Enter", 13)
+            time.sleep(0.7)
+            tab.evaluate("(document.activeElement && document.activeElement.blur()) || true")
+        elif offset is not None:
+            tab.evaluate(f"window.scrollTo({{top: {base + offset}, behavior: 'instant'}}) || true")
+        time.sleep(0.3)
+        tab.save_shot(folder / f"l{i:02d}_{label}.png")
+    write_plan(folder, lookup_plan(name, panel))
 
 
 PHONE_SCREENS = (
@@ -454,14 +538,41 @@ def stack_bands(image: Image.Image, bands: Sequence[Sequence[int]], scale: float
     return out
 
 
-def shared_palette(frames: Sequence[Image.Image], colors: int, samples: int = 8) -> Image.Image:
-    """One adaptive palette for a whole clip, cut from evenly spaced frames so static regions never shimmer."""
+def shared_palette(frames: Sequence[Image.Image], colors: int, samples: int = 8, reserve: int = 32,
+                   tolerance: int = 12, min_pixels: int = 16) -> Image.Image:
+    """One adaptive palette for a whole clip, cut from evenly spaced frames so static regions never shimmer.
+
+    An octree over the sampled frames fills all but ``reserve`` entries. The rest go, one at a time, to the colour
+    covering at least ``min_pixels`` pixels that the palette matches worst, while that error exceeds ``tolerance`` in
+    any channel, so small saturated marks such as legend swatches keep their hue. Unused slots repeat the first entry.
+    """
     picks = sorted({round(i * (len(frames) - 1) / max(samples - 1, 1)) for i in range(samples)})
     width, height = frames[0].size
     sheet = Image.new("RGB", (width, height * len(picks)))
     for row, index in enumerate(picks):
         sheet.paste(frames[index], (0, row * height))
-    return sheet.quantize(colors=colors, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE)
+    reserve = min(reserve, colors - 1)
+    base = sheet.quantize(colors=colors - reserve, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE)
+    entries = np.array(base.getpalette()[: (colors - reserve) * 3], dtype=np.int16).reshape(-1, 3)
+
+    pixels = np.asarray(sheet, dtype=np.int32).reshape(-1, 3)
+    codes, counts = np.unique((pixels[:, 0] << 16) | (pixels[:, 1] << 8) | pixels[:, 2], return_counts=True)
+    codes = codes[counts >= min_pixels]
+    common = np.stack([codes >> 16, (codes >> 8) & 255, codes & 255], axis=1).astype(np.int16)
+    error = np.full(len(common), 255, dtype=np.int16)
+    for entry in entries:
+        np.minimum(error, np.abs(common - entry).max(axis=1), out=error)
+    extra = []
+    while len(extra) < reserve and len(common) and error.max() > tolerance:
+        colour = common[error.argmax()]
+        extra.append(colour)
+        np.minimum(error, np.abs(common - colour).max(axis=1), out=error)
+
+    table = np.concatenate([entries, np.array(extra, dtype=np.int16).reshape(-1, 3)])
+    table = np.concatenate([table, np.repeat(table[:1], 256 - len(table), axis=0)])
+    palette = Image.new("P", (1, 1))
+    palette.putpalette(table.astype(np.uint8).ravel().tolist())
+    return palette
 
 
 def save_gif(path, frames: Sequence[Image.Image], durations: Sequence[int], colors: int = GIF_COLORS) -> None:
