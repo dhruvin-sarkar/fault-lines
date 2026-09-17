@@ -52,11 +52,65 @@ def load_regional_impact() -> pd.DataFrame:
     return pd.read_csv(REGIONAL_IMPACT_CSV)
 
 
+def report_lines(table: pd.DataFrame, draws: int, alpha: float = 0.05) -> list[str]:
+    """Lines of ``regional_impact.md``, which documents ``regional_impact.csv``.
+
+    Parameters: ``table``, the regional impact table; ``draws``, random sets per neuropil size; ``alpha``, the
+    family-wise level used to state the Bonferroni threshold.
+    Returns the markdown lines.
+    """
+    tests = len(table)
+    floor = 1 / (1 + draws)
+    bonferroni = alpha / tests
+    return [
+        "# Regional impact",
+        "",
+        "Each cell type is anchored to the neuropil holding the largest share of its synapses (pre plus post), "
+        "excluding aggregate compartments and unassigned remainders. For every neuropil, all types anchored in it are "
+        "removed together and the loss of sensory-to-motor flow capacity is compared with random sets of the same "
+        f"number of types. The table is `regional_impact.csv`, one row per neuropil ({tests} neuropils).",
+        "",
+        "| column | meaning |",
+        "|---|---|",
+        "| neuropil | anchor neuropil |",
+        "| intact_flow | flow capacity of the intact graph |",
+        "| n_types | cell types anchored in the neuropil |",
+        "| n_sensory, n_motor | of those, types in the sensory set and in the descending or motor set |",
+        "| flow_after | flow capacity with every anchored type removed |",
+        "| flow_drop | share of intact flow capacity lost |",
+        f"| random_mean, random_sd | mean and standard deviation of the share lost over {draws} same-size random sets |",
+        "| excess_over_random | flow_drop minus random_mean |",
+        f"| p_value | one-sided empirical p = (1 + k) / (1 + {draws}), k = random sets losing at least as much flow |",
+        "",
+        f"With {draws} random sets the smallest attainable p is 1/{draws + 1} = {floor:.4f}. A Bonferroni correction "
+        f"across the {tests} neuropils requires p < {alpha}/{tests} = {bonferroni:.5f}, "
+        + ("which no neuropil can reach with this number of draws. " if floor >= bonferroni else
+           "which the smallest attainable p can reach. ")
+        + f"{int((table['p_value'] < alpha).sum())} neuropils have p < {alpha} and "
+        f"{int(np.isclose(table['p_value'], floor).sum())} reach the minimum, but these p-values are uncorrected and "
+        "serve to rank regions, not to establish significance for any one of them. This analysis is exploratory.",
+        "",
+    ]
+
+
+def write_report(table: pd.DataFrame, draws: int) -> None:
+    """Write ``regional_impact.md`` next to the CSV and print it."""
+    lines = report_lines(table, draws)
+    (RESULTS / "regional_impact.md").write_text("\n".join(lines), encoding="utf-8")
+    print("\n".join(lines))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--draws", type=int, default=RANDOM_DRAWS)
     parser.add_argument("--workers", type=int, default=2)
+    parser.add_argument("--from-csv", action="store_true",
+                        help="rebuild regional_impact.md from results/regional_impact.csv instead of recomputing")
     args = parser.parse_args()
+
+    if args.from_csv:
+        write_report(load_regional_impact(), args.draws)
+        return
 
     graph = load_type_graph()
     sources, targets = load_sensory_motor_sets()
@@ -90,6 +144,7 @@ def main() -> None:
         })
     table = pd.DataFrame(rows).sort_values("flow_drop", ascending=False)
     table.to_csv(REGIONAL_IMPACT_CSV, index=False, float_format="%.5g")
+    write_report(table, args.draws)
     print(f"{len(table)} neuropils, {int(table['n_types'].sum())} of {graph.vcount()} types anchored")
     print(table.head(15).to_string(index=False))
 

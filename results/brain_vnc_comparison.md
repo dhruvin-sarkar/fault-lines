@@ -21,7 +21,7 @@ Same protocol as the whole CNS: six adaptive strategies, 1% of remaining types p
 
 | strategy | brain AUC (flow) | VNC AUC (flow) | brain AUC (reachability) | VNC AUC (reachability) | brain f_c | VNC f_c |
 |---|---|---|---|---|---|---|
-| random | 0.572 (0.564–0.579) | 0.579 (0.573–0.586) | 0.583 (0.576–0.590) | 0.577 (0.568–0.585) | 0.284 | 0.288 |
+| random | 0.572 (0.564 to 0.579) | 0.579 (0.573 to 0.586) | 0.583 (0.576 to 0.590) | 0.577 (0.568 to 0.585) | 0.284 | 0.288 |
 | weighted out-degree | 0.257 | 0.276 | 0.422 | 0.390 | 0.063 | 0.093 |
 | weighted in-degree | 0.504 | 0.228 | 0.556 | 0.365 | 0.253 | 0.066 |
 | betweenness | 0.544 | 0.477 | 0.619 | 0.524 | 0.255 | 0.206 |

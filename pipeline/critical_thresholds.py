@@ -67,8 +67,8 @@ def main() -> None:
     for s in order:
         r = table[s]
         if s == "random":
-            lines.append(f"| {STRATEGY_LABELS[s]} | {r['f_c']:.4f} (95% CI {r['f_c_ci95'][0]:.4f}–{r['f_c_ci95'][1]:.4f}) | "
-                         f"{r['f_c_batch']:.4f} (95% CI {r['f_c_batch_ci95'][0]:.4f}–{r['f_c_batch_ci95'][1]:.4f}) |")
+            lines.append(f"| {STRATEGY_LABELS[s]} | {r['f_c']:.4f} (95% CI {r['f_c_ci95'][0]:.4f} to {r['f_c_ci95'][1]:.4f}) | "
+                         f"{r['f_c_batch']:.4f} (95% CI {r['f_c_batch_ci95'][0]:.4f} to {r['f_c_batch_ci95'][1]:.4f}) |")
         else:
             lines.append(f"| {STRATEGY_LABELS[s]} | {r['f_c']:.4f} | {r['f_c_batch']:.4f} |")
     lines += [

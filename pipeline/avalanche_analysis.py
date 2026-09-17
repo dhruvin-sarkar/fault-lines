@@ -205,7 +205,7 @@ def main() -> None:
         "",
         "## Method",
         "",
-        "Discrete power-law fit by maximum likelihood with x_min chosen to minimize the Kolmogorov–Smirnov distance "
+        "Discrete power-law fit by maximum likelihood with x_min chosen to minimize the Kolmogorov-Smirnov distance "
         "(Clauset, Shalizi and Newman, 2009), using the `powerlaw` package (Alstott, Bullmore and Plenz, 2014). "
         "Goodness of fit by semi-parametric bootstrap; the power law is treated as plausible when p ≥ 0.1. "
         "Alternatives compared by Vuong's normalized log-likelihood ratio. No log-log regression is used.",

@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pipeline.regional_impact import anchor_neuropils, upper_p_value
+from pipeline.regional_impact import anchor_neuropils, report_lines, upper_p_value
 
 NEURONS = pd.DataFrame({"bodyId": [1, 2, 3], "type": ["A", "A", "B"]})
 
@@ -44,3 +44,19 @@ def test_upper_p_value_counts_the_observation_itself():
     assert upper_p_value(null, 0.5) == pytest.approx(1 / 5)
     assert upper_p_value(null, 0.25) == pytest.approx(3 / 5)
     assert upper_p_value(null, 0.0) == pytest.approx(1.0)
+
+
+def impact_table(p_values: list[float]) -> pd.DataFrame:
+    return pd.DataFrame({"neuropil": [f"N{i}" for i in range(len(p_values))], "p_value": p_values})
+
+
+def test_report_states_that_no_neuropil_can_pass_bonferroni_with_too_few_draws():
+    text = "\n".join(report_lines(impact_table([1 / 201, 1 / 201, 0.03] + [0.5] * 88), draws=200))
+    assert "smallest attainable p is 1/201 = 0.0050" in text
+    assert "0.05/91 = 0.00055, which no neuropil can reach" in text
+    assert "3 neuropils have p < 0.05 and 2 reach the minimum" in text
+
+
+def test_report_allows_bonferroni_when_draws_suffice():
+    text = "\n".join(report_lines(impact_table([0.5, 0.5]), draws=1000))
+    assert "which the smallest attainable p can reach" in text

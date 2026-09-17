@@ -9,7 +9,7 @@ f_c is the fraction of cell types removed at which sensory-to-motor flow capacit
 | sensory-motor betweenness | 0.0961 | 0.1051 |
 | weighted in-degree | 0.1387 | 0.1407 |
 | PageRank | 0.1875 | 0.1910 |
-| random | 0.2832 (95% CI 0.2774–0.2890) | 0.2870 (95% CI 0.2811–0.2929) |
+| random | 0.2832 (95% CI 0.2774 to 0.2890) | 0.2870 (95% CI 0.2811 to 0.2929) |
 
 Under weighted out-degree removal, sensory-to-motor flow capacity halves after removing 4.1% of cell types; under random removal it takes 28.3%.
 

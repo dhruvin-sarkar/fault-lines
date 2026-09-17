@@ -13,7 +13,7 @@ STRATEGY_COLORS = {
     "pagerank": "#1baf7a",
     "out_strength": "#eda100",
     "in_strength": "#e87ba4",
-    "random": "#898781",
+    "random": "#868f94",
 }
 SURFACE = "#fcfcfb"
 INK = "#0b0b0b"

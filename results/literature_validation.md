@@ -24,11 +24,13 @@ Evidence: S = activating the neurons evokes the behavior; N = silencing or ablat
 | `PPL101` | PPL1-γ1pedc | punishment signal for aversive memory | S+N | cb_intrinsic | 2 | 22.6 | 32.3 | 46.0 | [aso2014] |
 | `MN9` (positive control) | mn9 motor neuron | proboscis extension | S+N | cb_motor | 2 | 9.8 | 69.5 | 6.0 | [mckellar2020]; [gordon2009] |
 
-Name mapping notes. `MDN` is the connectome type for the moonwalker descending neurons ("DNp50" appears only as a synonym). P9 is scored as `DNp09`, which matches the FlyWire and MANC type of the genetic line used; a second type, `DNp71`, also carries the hemibrain label DNp09 and is tested as a sensitivity check. `aSP22` is the connectome name for the descending neuron published as DNa12. For DNa02, bilateral silencing did not reduce turning, so the evidence is sufficiency only. `MN9` is a motor neuron and thus structurally essential almost by construction; it is kept out of the primary test. Descending neuron nomenclature follows Namiki et al. (2018) [namiki2018].
+Name mapping notes. `MDN` is the connectome type for the moonwalker descending neurons ("DNp50" appears only as a synonym). P9 is scored as `DNp09`, which matches the FlyWire and MANC type of the genetic line used; a second type, `DNp71`, also carries the hemibrain label DNp09 and is tested as a sensitivity check. `aSP22` is the connectome name for the descending neuron published as DNa12. For DNa02, bilateral silencing did not reduce turning, so the evidence is sufficiency only. Descending neuron nomenclature follows Namiki et al. (2018) [namiki2018].
+
+`MN9`, the positive control named in the preregistration, is kept out of the primary test. It is a motor neuron type, and its published importance lies in its motor output, not in routing signals between the sensory and motor sets, which is what the structural scores measure. It lies on no shortest sensory-to-motor route between other types, so its sensory-motor betweenness is 0 (percentile 9.8, the tied rank of every type scoring zero), and removing it alone costs 1 path of flow capacity. It is therefore not a positive control for these scores, and the sensitivity result below reports what including it does to the test.
 
 ## Test
 
-One-sided Mann–Whitney U test, alternative that the curated types score higher than all other cell types. A rank-based test is used because centrality scores are heavy-tailed with many ties at zero and the two groups differ in size by three orders of magnitude, so no distributional assumption is appropriate. The AUC (U divided by the product of group sizes) is the probability that a randomly chosen curated type outscores a randomly chosen other type. α = 0.05.
+One-sided Mann-Whitney U test, alternative that the curated types score higher than all other cell types. A rank-based test is used because centrality scores are heavy-tailed with many ties at zero and the two groups differ in size by three orders of magnitude, so no distributional assumption is appropriate. The AUC (U divided by the product of group sizes) is the probability that a randomly chosen curated type outscores a randomly chosen other type. α = 0.05.
 
 | set | score | n | U | p (one-sided) | AUC | median percentile | result |
 |---|---|---|---|---|---|---|---|
@@ -43,6 +45,8 @@ One-sided Mann–Whitney U test, alternative that the curated types score higher
 | DNp71 instead of DNp09 | global betweenness | 14 | 138303 | 4.8e-06 | 0.842 | 96.5 | significant |
 
 Primary result: the curated types do rank significantly higher in sensory-motor betweenness than other cell types (U = 103535, p = 0.045, AUC = 0.63, median percentile 77).
+
+Sensitivity to the positive control: without `MN9` the sensory-motor betweenness test gives p = 0.045 (AUC = 0.63, significant); with it, p = 0.10 (AUC = 0.59, not significant). The primary result therefore depends on excluding it, as the preregistration specified before any score was computed. Its low score reflects its role as an output rather than a relay and says nothing about whether `MN9` matters for behavior.
 
 A positive result shows agreement between a structural ranking and published behavioral experiments for this small, non-random sample of well-studied neurons. Well-studied neurons are not a random draw from the population (they were found because they are large, accessible or have striking phenotypes), so the test cannot show that the ranking identifies essential neurons in general.
 

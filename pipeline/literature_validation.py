@@ -1,5 +1,6 @@
 """Test whether cell types with published behavioral necessity or sufficiency rank high in structural criticality."""
 
+import argparse
 import json
 
 import numpy as np
@@ -99,23 +100,30 @@ def main() -> None:
     results = {name: {score: rank_test(table[score], members) for score in SCORES} for name, members in sets.items()}
     percentiles = pd.DataFrame({score: percentile_ranks(table[score]) for score in SCORES})
 
-    (RESULTS / "literature_validation.json").write_text(json.dumps({
+    report = {
         "alpha": ALPHA, "tests": results,
         "curated_types": {t: {"published_name": name, "behavior": behavior, "evidence": evidence,
                               "superclass": table.loc[t, "superclass"], "n_neurons": int(table.loc[t, "n_neurons"]),
                               **{f"{s}_percentile": float(percentiles.loc[t, s]) for s in SCORES},
                               **{s: float(table.loc[t, s]) for s in SCORES}}
                           for t, name, behavior, evidence, _ in CURATED + [POSITIVE_CONTROL]},
-    }, indent=2) + "\n", encoding="utf-8")
+    }
+    (RESULTS / "literature_validation.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    plot(report)
+    write_report(report)
 
+
+def plot(report: dict) -> None:
+    """Draw ``literature_rank_plot.png`` from the dictionary written to ``literature_validation.json``."""
+    types = report["curated_types"]
     apply_style()
     fig, ax = plt.subplots(figsize=(8.5, 5.4), dpi=200)
-    order = sorted(CURATED + [POSITIVE_CONTROL], key=lambda c: percentiles.loc[c[0], "sm_betweenness"])
+    order = sorted(CURATED + [POSITIVE_CONTROL], key=lambda c: types[c[0]]["sm_betweenness_percentile"])
     y = np.arange(len(order))
     for j, (score, color) in enumerate([("sm_betweenness", STRATEGY_COLORS["sm_betweenness"]),
                                         ("flow_drop", STRATEGY_COLORS["pagerank"]),
                                         ("betweenness", STRATEGY_COLORS["betweenness"])]):
-        ax.scatter([percentiles.loc[c[0], score] for c in order], y + (j - 1) * 0.22, s=36, color=color,
+        ax.scatter([types[c[0]][f"{score}_percentile"] for c in order], y + (j - 1) * 0.22, s=36, color=color,
                    label=SCORES[score], zorder=3)
     ax.axvline(50, color=MUTED, linewidth=1, linestyle="--")
     ax.set_yticks(y, [f"{c[0]}{' (control)' if c is POSITIVE_CONTROL else ''}" for c in order], fontsize=8.5, color=INK)
@@ -123,16 +131,33 @@ def main() -> None:
     ax.set_xlabel("percentile among all cell types (higher = more critical)")
     ax.set_title("Behaviorally validated cell types in the structural rankings", loc="left", pad=28)
     ax.legend(loc="lower center", bbox_to_anchor=(0.5, 1.02), ncol=3, fontsize=8, frameon=False)
-    p = results["primary"]["sm_betweenness"]
+    p = report["tests"]["primary"]["sm_betweenness"]
     fig.text(0.01, 0.01, f"Primary test (sensory-motor betweenness, one-sided Mann-Whitney U, n = {p['n_curated']} vs "
              f"{p['n_other']}): U = {p['U']:.0f}, p = {p['p_value']:.2g}, AUC = {p['auc']:.2f}.", fontsize=8, color=INK_SECONDARY)
     fig.tight_layout(rect=(0, 0.03, 1, 1))
     fig.savefig(RESULTS / "literature_rank_plot.png")
     plt.close(fig)
 
-    def verdict(r: dict) -> str:
-        return "significant" if r["p_value"] < ALPHA else "not significant"
 
+def p_text(p: float) -> str:
+    return f"{p:.2g}" if p < 0.1 else f"{p:.2f}"
+
+
+def report_lines(report: dict) -> list[str]:
+    """Lines of ``literature_validation.md``.
+
+    Parameters: ``report``, the dictionary written to ``literature_validation.json``.
+    Returns the markdown lines.
+    """
+    alpha, results, types = report["alpha"], report["tests"], report["curated_types"]
+
+    def verdict(r: dict) -> str:
+        return "significant" if r["p_value"] < alpha else "not significant"
+
+    control = POSITIVE_CONTROL[0]
+    primary, with_control = results["primary"]["sm_betweenness"], results["with_positive_control"]["sm_betweenness"]
+    control_row = types[control]
+    flow_cost = control_row["flow_drop"]
     lines = [
         "# Literature validation",
         "",
@@ -150,43 +175,63 @@ def main() -> None:
         "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for t, name, behavior, evidence, refs in CURATED + [POSITIVE_CONTROL]:
-        label = f"`{t}`" + (" (positive control)" if t == POSITIVE_CONTROL[0] else "")
-        lines.append(f"| {label} | {name} | {behavior} | {evidence} | {table.loc[t, 'superclass']} | {int(table.loc[t, 'n_neurons'])} | "
-                     f"{percentiles.loc[t, 'sm_betweenness']:.1f} | {percentiles.loc[t, 'flow_drop']:.1f} | "
-                     f"{percentiles.loc[t, 'betweenness']:.1f} | {'; '.join(f'[{r}]' for r in refs)} |")
+        label = f"`{t}`" + (" (positive control)" if t == control else "")
+        row = types[t]
+        lines.append(f"| {label} | {name} | {behavior} | {evidence} | {row['superclass']} | {row['n_neurons']} | "
+                     f"{row['sm_betweenness_percentile']:.1f} | {row['flow_drop_percentile']:.1f} | "
+                     f"{row['betweenness_percentile']:.1f} | {'; '.join(f'[{r}]' for r in refs)} |")
     lines += [
         "",
         "Name mapping notes. `MDN` is the connectome type for the moonwalker descending neurons (\"DNp50\" appears only "
         "as a synonym). P9 is scored as `DNp09`, which matches the FlyWire and MANC type of the genetic line used; a "
         "second type, `DNp71`, also carries the hemibrain label DNp09 and is tested as a sensitivity check. `aSP22` is "
         "the connectome name for the descending neuron published as DNa12. For DNa02, bilateral silencing did not "
-        "reduce turning, so the evidence is sufficiency only. `MN9` is a motor neuron and thus structurally essential "
-        "almost by construction; it is kept out of the primary test. Descending neuron nomenclature follows Namiki et "
-        "al. (2018) [namiki2018].",
+        "reduce turning, so the evidence is sufficiency only. Descending neuron nomenclature follows Namiki et al. "
+        "(2018) [namiki2018].",
+        "",
+        f"`{control}`, the positive control named in the preregistration, is kept out of the primary test. It is a "
+        "motor neuron type, and its published importance lies in its motor output, not in routing signals between the "
+        "sensory and motor sets, which is what the structural scores measure. "
+        + (f"It lies on no shortest sensory-to-motor route between other types, so its sensory-motor betweenness is 0 "
+           f"(percentile {control_row['sm_betweenness_percentile']:.1f}, the tied rank of every type scoring zero)"
+           if control_row["sm_betweenness"] == 0 else
+           f"Its sensory-motor betweenness percentile is {control_row['sm_betweenness_percentile']:.1f}")
+        + f", and removing it alone costs {flow_cost:.0f} path{'' if flow_cost == 1 else 's'} of flow capacity. It is "
+        "therefore not a positive control for these scores, and the sensitivity result below reports what including "
+        "it does to the test.",
         "",
         "## Test",
         "",
-        "One-sided Mann–Whitney U test, alternative that the curated types score higher than all other cell types. A "
+        "One-sided Mann-Whitney U test, alternative that the curated types score higher than all other cell types. A "
         "rank-based test is used because centrality scores are heavy-tailed with many ties at zero and the two groups "
         "differ in size by three orders of magnitude, so no distributional assumption is appropriate. The AUC "
         "(U divided by the product of group sizes) is the probability that a randomly chosen curated type outscores a "
-        f"randomly chosen other type. α = {ALPHA}.",
+        f"randomly chosen other type. α = {alpha}.",
         "",
         "| set | score | n | U | p (one-sided) | AUC | median percentile | result |",
         "|---|---|---|---|---|---|---|---|",
     ]
-    set_labels = {"primary": "primary (14 types)", "with_positive_control": "with MN9", "DNp71_for_DNp09": "DNp71 instead of DNp09"}
-    for name in sets:
+    set_labels = {"primary": f"primary ({len(CURATED)} types)", "with_positive_control": f"with {control}",
+                  "DNp71_for_DNp09": f"{ALTERNATIVE_P9} instead of DNp09"}
+    for name in set_labels:
         for score, label in SCORES.items():
             r = results[name][score]
             lines.append(f"| {set_labels[name]} | {label} | {r['n_curated']} | {r['U']:.0f} | {r['p_value']:.2g} | "
                          f"{r['auc']:.3f} | {r['median_percentile']:.1f} | {verdict(r)} |")
-    p = results["primary"]["sm_betweenness"]
     lines += [
         "",
-        f"Primary result: the curated types {'do' if p['p_value'] < ALPHA else 'do not'} rank significantly higher in "
-        f"sensory-motor betweenness than other cell types (U = {p['U']:.0f}, p = {p['p_value']:.2g}, AUC = {p['auc']:.2f}, "
-        f"median percentile {p['median_percentile']:.0f}).",
+        f"Primary result: the curated types {'do' if primary['p_value'] < alpha else 'do not'} rank significantly higher "
+        f"in sensory-motor betweenness than other cell types (U = {primary['U']:.0f}, p = {p_text(primary['p_value'])}, "
+        f"AUC = {primary['auc']:.2f}, median percentile {primary['median_percentile']:.0f}).",
+        "",
+        f"Sensitivity to the positive control: without `{control}` the sensory-motor betweenness test gives "
+        f"p = {p_text(primary['p_value'])} (AUC = {primary['auc']:.2f}, {verdict(primary)}); with it, "
+        f"p = {p_text(with_control['p_value'])} (AUC = {with_control['auc']:.2f}, {verdict(with_control)}). "
+        + ("The primary result therefore depends on excluding it, as the preregistration specified before any score "
+           "was computed. " if verdict(primary) != verdict(with_control) else
+           "Including it does not change the conclusion. ")
+        + f"Its low score reflects its role as an output rather than a relay and says nothing about whether "
+        f"`{control}` matters for behavior.",
         "",
         "A positive result shows agreement between a structural ranking and published behavioral experiments for this "
         "small, non-random sample of well-studied neurons. Well-studied neurons are not a random draw from the "
@@ -200,9 +245,24 @@ def main() -> None:
         *[f"- [{key}] {text}" for key, text in REFERENCES.items()],
         "",
     ]
+    return lines
+
+
+def write_report(report: dict) -> None:
+    """Write ``literature_validation.md`` for ``report`` and print its test section."""
+    lines = report_lines(report)
     (RESULTS / "literature_validation.md").write_text("\n".join(lines), encoding="utf-8")
-    print("\n".join(lines[-len(REFERENCES) - 12:-len(REFERENCES) - 3]))
+    print("\n".join(lines[lines.index("## Test"):lines.index("## References")]))
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--from-json", action="store_true",
+                        help="rebuild the report and figure from results/literature_validation.json instead of "
+                             "recomputing")
+    if parser.parse_args().from_json:
+        saved = json.loads((RESULTS / "literature_validation.json").read_text(encoding="utf-8"))
+        plot(saved)
+        write_report(saved)
+    else:
+        main()

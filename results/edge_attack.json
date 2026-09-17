@@ -8,6 +8,13 @@
       "label": "strongest connections first",
       "color": "#eda100",
       "critical_fraction": 0.2684998353943757,
+      "critical_fraction_trials": [
+        0.2684998353943757
+      ],
+      "critical_fraction_range": [
+        0.2684998353943757,
+        0.2684998353943757
+      ],
       "fraction_removed": [
         0.0,
         0.009998397955956112,
@@ -172,6 +179,10 @@
       "label": "weakest connections first",
       "color": "#1baf7a",
       "critical_fraction": null,
+      "critical_fraction_trials": [
+        null
+      ],
+      "critical_fraction_range": null,
       "fraction_removed": [
         0.0,
         0.009998397955956112,
@@ -334,8 +345,19 @@
     },
     "random": {
       "label": "random connections",
-      "color": "#898781",
-      "critical_fraction": 0.47398143096944406,
+      "color": "#868f94",
+      "critical_fraction": 0.4763896318763209,
+      "critical_fraction_trials": [
+        0.47398143096944406,
+        0.48011992074329407,
+        0.47222868258935324,
+        0.4772895952814228,
+        0.47832852979809004
+      ],
+      "critical_fraction_range": [
+        0.47222868258935324,
+        0.48011992074329407
+      ],
       "fraction_removed": [
         0.0,
         0.009998397955956112,

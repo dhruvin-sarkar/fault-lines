@@ -8,7 +8,7 @@ This asks whether *structural failure cascades* in the wiring diagram are scale-
 
 ## Method
 
-Discrete power-law fit by maximum likelihood with x_min chosen to minimize the Kolmogorov–Smirnov distance (Clauset, Shalizi and Newman, 2009), using the `powerlaw` package (Alstott, Bullmore and Plenz, 2014). Goodness of fit by semi-parametric bootstrap; the power law is treated as plausible when p ≥ 0.1. Alternatives compared by Vuong's normalized log-likelihood ratio. No log-log regression is used.
+Discrete power-law fit by maximum likelihood with x_min chosen to minimize the Kolmogorov-Smirnov distance (Clauset, Shalizi and Newman, 2009), using the `powerlaw` package (Alstott, Bullmore and Plenz, 2014). Goodness of fit by semi-parametric bootstrap; the power law is treated as plausible when p ≥ 0.1. Alternatives compared by Vuong's normalized log-likelihood ratio. No log-log regression is used.
 
 Primary data: every batch within the first 50% of removals for one run per strategy (the five targeted runs and random trial 0). Sensitivity: the five targeted runs plus all 30 random trials.
 

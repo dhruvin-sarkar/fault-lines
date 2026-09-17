@@ -2,7 +2,7 @@
 
 ## Criteria
 
-A type qualifies if, on the intact graph of 11751 types, it ranks in the bottom half by total degree (number of distinct input and output partner types) and in the bottom half by PageRank, yet in the top 1% by sensory-motor betweenness (the number of shortest sensory-to-motor routes, summed over all reachable pairs, that pass through it). Percentiles are mid-rank. All numbers below come from a single run of `pipeline/hidden_bottleneck.py` on the same graph.
+A type qualifies if, on the intact graph of 11751 types, it ranks in the bottom half by total degree (input partner types plus output partner types, so a partner connected in both directions counts twice) and in the bottom half by PageRank, yet in the top 1% by sensory-motor betweenness (the number of shortest sensory-to-motor routes, summed over all reachable pairs, that pass through it). Percentiles are mid-rank. All numbers below come from a single run of `pipeline/hidden_bottleneck.py` on the same graph.
 
 4 types qualify (`results/hidden_bottleneck_candidates.csv`):
 

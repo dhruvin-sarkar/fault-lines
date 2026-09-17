@@ -158,8 +158,9 @@ def main() -> None:
         "## Losing a whole class",
         "",
         f"Every cell type of one superclass removed at once, for the {len(classes)} superclasses with at least "
-        f"{MIN_SUPERCLASS} types. The null is {args.draws} random sets of the same size, and p is the fraction of "
-        "those random sets that lose at least as much flow.",
+        f"{MIN_SUPERCLASS} types. The null is {args.draws} random sets of the same size, and p = (1 + k) / "
+        f"(1 + {args.draws}), where k is the number of those random sets that lose at least as much flow, so the "
+        f"smallest attainable p is 1/{args.draws + 1} = {1 / (args.draws + 1):.3f}.",
         "",
         "| superclass | types | neurons | flow lost | same-size random | p |",
         "|---|---|---|---|---|---|",

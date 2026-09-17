@@ -18,7 +18,7 @@ The k-core decomposition of the undirected projection reaches k = 23, and 9,367 
 
 ## Losing a whole class
 
-Every cell type of one superclass removed at once, for the 13 superclasses with at least 20 types. The null is 200 random sets of the same size, and p is the fraction of those random sets that lose at least as much flow.
+Every cell type of one superclass removed at once, for the 13 superclasses with at least 20 types. The null is 200 random sets of the same size, and p = (1 + k) / (1 + 200), where k is the number of those random sets that lose at least as much flow, so the smallest attainable p is 1/201 = 0.005.
 
 | superclass | types | neurons | flow lost | same-size random | p |
 |---|---|---|---|---|---|

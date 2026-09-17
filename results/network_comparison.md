@@ -13,7 +13,7 @@ The threshold here is the fraction of cell types removed when the maximum sensor
 | sensory-motor betweenness | 0.096 |
 | weighted in-degree | 0.139 |
 | PageRank | 0.187 |
-| random | 0.283 (95% CI 0.277–0.289) |
+| random | 0.283 (95% CI 0.277 to 0.289) |
 
 ## Published thresholds (values printed in the primary source)
 

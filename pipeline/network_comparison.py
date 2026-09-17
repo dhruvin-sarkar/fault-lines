@@ -155,7 +155,7 @@ def main() -> None:
         "|---|---|",
         *[f"| {STRATEGY_LABELS[s]} | {v['f_c']:.3f} |" for s, v in sorted(ours.items(), key=lambda kv: kv[1]["f_c"])
           if s != "random"],
-        f"| {STRATEGY_LABELS['random']} | {ours['random']['f_c']:.3f} (95% CI {random_ci[0]:.3f}–{random_ci[1]:.3f}) |",
+        f"| {STRATEGY_LABELS['random']} | {ours['random']['f_c']:.3f} (95% CI {random_ci[0]:.3f} to {random_ci[1]:.3f}) |",
         "",
         "## Published thresholds (values printed in the primary source)",
         "",

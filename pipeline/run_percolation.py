@@ -27,6 +27,8 @@ RANDOM_TRIALS = 30
 RUNS_DIR = DATA / "percolation_runs"
 CURVES_CSV = RESULTS / "percolation_curves.csv"
 SCORES_JSON = RESULTS / "fragility_scores.json"
+SCORES_MD = RESULTS / "fragility_scores.md"
+THRESHOLDS_JSON = RESULTS / "critical_thresholds.json"
 TARGETED = tuple(s for s in STRATEGIES if s != "random")
 
 
@@ -127,6 +129,163 @@ def score_runs(runs: dict, intact_flow: int, intact_pairs: int) -> dict:
     return scores
 
 
+def runs_from_curves(curves: pd.DataFrame, cell_types: int) -> dict[tuple[str, int], dict]:
+    """Runs keyed by (strategy, trial), read back from a ``percolation_curves.csv`` table.
+
+    Parameters: ``curves``, the table; ``cell_types``, the vertex count of the graph, used to restore the exact
+    removed fractions from their rounded values in the CSV.
+    Returns ``fraction_removed``, ``flow`` and ``reachable_pairs`` arrays per run, in batch order.
+    """
+    return {
+        (strategy, int(trial)): {
+            "fraction_removed": np.rint(rows["fraction_removed"].to_numpy() * cell_types) / cell_types,
+            "flow": rows["flow"].to_numpy(),
+            "reachable_pairs": rows["reachable_pairs"].to_numpy(),
+        }
+        for (strategy, trial), rows in curves.sort_values("batch").groupby(["strategy", "trial"])
+    }
+
+
+def report_lines(summary: dict, thresholds: dict, batches: int) -> list[str]:
+    """Lines of ``fragility_scores.md``.
+
+    Parameters: ``summary``, the dictionary written to ``fragility_scores.json``; ``thresholds``, the dictionary
+    written to ``critical_thresholds.json``; ``batches``, the number of removal batches taken to reach the end of
+    the AUC range.
+    Returns the markdown lines.
+    """
+    graph, protocol, scores = summary["graph"], summary["protocol"], summary["strategies"]
+    f_c = thresholds["strategies"]
+    random_scores = scores["random"]
+    trials = protocol["random_trials"]
+    start, end = protocol["auc_range"]
+    targeted = [s for s in STRATEGIES if s != "random"]
+
+    def pct(value: float) -> str:
+        return f"{100 * value:.0f}%"
+
+    def with_ci(value: float, ci: list[float]) -> str:
+        return f"{value:.3f} (95% CI {ci[0]:.3f} to {ci[1]:.3f})"
+
+    def spread(values: list[float]) -> str:
+        return f"{min(values):.3f} to {max(values):.3f} (SD {np.std(values, ddof=1):.3f})"
+
+    def listing(strategies: list[str], key) -> str:
+        items = [f"{STRATEGY_LABELS[s]} ({key(s):.3f})" for s in strategies]
+        return items[0] if len(items) == 1 else ", ".join(items[:-1]) + f" and {items[-1]}"
+
+    def auc_cell(strategy: str, key: str) -> str:
+        entry = scores[strategy]
+        return with_ci(entry[key], entry[f"{key}_ci95"]) if strategy == "random" else f"{entry[key]:.3f}"
+
+    def f_c_cell(strategy: str) -> str:
+        entry = f_c[strategy]
+        return with_ci(entry["f_c"], entry["f_c_ci95"]) if strategy == "random" else f"{entry['f_c']:.3f}"
+
+    by_flow = sorted(targeted, key=lambda s: scores[s]["auc_flow"])
+    by_pairs = sorted(targeted, key=lambda s: scores[s]["auc_reachability"])
+    by_f_c = sorted(targeted, key=lambda s: f_c[s]["f_c"])
+    failed = [s for s, ok in summary["checkpoint_targeted_below_random"].items() if not all(ok.values())]
+    below_ci = all(scores[s][key] < random_scores[f"{key}_ci95"][0]
+                   for s in targeted for key in ("auc_flow", "auc_reachability"))
+
+    ranking = [
+        f"By flow capacity AUC the most damaging order is {STRATEGY_LABELS[by_flow[0]]} "
+        f"({scores[by_flow[0]]['auc_flow']:.3f}), followed by "
+        f"{listing(by_flow[1:], lambda s: scores[s]['auc_flow'])}; random removal scores "
+        f"{random_scores['auc_flow']:.3f}. By reachability AUC the order is "
+        f"{listing(by_pairs, lambda s: scores[s]['auc_reachability'])}, against "
+        f"{random_scores['auc_reachability']:.3f} for random removal.",
+    ]
+    if by_f_c != by_flow:
+        ranking.append(
+            f" Ordered by f_c instead, the sequence is {', '.join(STRATEGY_LABELS[s] for s in by_f_c[:-1])} and "
+            f"{STRATEGY_LABELS[by_f_c[-1]]}, because f_c marks the single point where flow halves while the AUC "
+            f"averages over the whole first {pct(end)} of removals."
+        )
+    if failed:
+        check = f"not met for {', '.join(STRATEGY_LABELS[s] for s in failed)}."
+    else:
+        check = "met." + (" Every targeted score also lies below the lower bound of the random-removal confidence "
+                          "interval." if below_ci else "")
+
+    return [
+        "# Fragility scores",
+        "",
+        "How much sensory-to-motor routing survives as cell types are removed, and how much faster it fails when the "
+        "most central types are removed first. Each strategy is summarized by the area under its removal curve, one "
+        "number for the whole first half of the attack. The protocol was fixed in `results/preregistration.md` before "
+        "any removal was run. Every curve is in `results/percolation_curves.csv` and every score in "
+        "`results/fragility_scores.json`.",
+        "",
+        "## Graph",
+        "",
+        "| quantity | value |",
+        "|---|---|",
+        f"| cell types | {graph['cell_types']:,} |",
+        f"| connections | {graph['edges']:,} |",
+        f"| sensory types (S) | {graph['sensory_types']:,} |",
+        f"| descending and motor types (M) | {graph['motor_types']:,} |",
+        f"| intact flow capacity (edge-disjoint S-to-M paths) | {graph['intact_flow']:,} |",
+        f"| intact reachable S-M pairs | {graph['intact_reachable_pairs']:,} of {graph['sensory_motor_pairs']:,} "
+        f"({100 * graph['intact_reachable_pairs'] / graph['sensory_motor_pairs']:.1f}%) |",
+        "",
+        "## Protocol",
+        "",
+        f"- Strategies: {', '.join(STRATEGY_LABELS[s] for s in STRATEGIES[:-1])} and "
+        f"{STRATEGY_LABELS[STRATEGIES[-1]]}.",
+        f"- Adaptive removal: each batch removes the {pct(protocol['batch_fraction_of_remaining'])} of remaining cell "
+        f"types with the highest current score, and every score is recomputed on the reduced graph before the next "
+        f"batch. Reaching {pct(end)} removed takes {batches} batches.",
+        f"- Fragility score: the trapezoidal area under the retained fraction of the intact value, plotted against the "
+        f"fraction of cell types removed from {pct(start)} to {pct(end)}, divided by the width of that range. It is the "
+        f"mean retained fraction over the range: 1 means nothing was lost, and lower is more fragile.",
+        "- Metrics: flow capacity (primary) and the number of reachable sensory-motor pairs (secondary).",
+        f"- Random removal: {trials} trials, reported as the mean with a Student-t 95% confidence interval. Each "
+        f"targeted strategy is run once.",
+        f"- Seed: {protocol['seed']}.",
+        f"- f_c: the fraction of cell types removed when flow capacity first falls below {pct(thresholds['cutoff'])} "
+        f"of its intact value, interpolated between batches ([critical_thresholds.md](critical_thresholds.md)).",
+        "",
+        "## Scores",
+        "",
+        "| strategy | AUC, flow capacity | AUC, reachability | f_c |",
+        "|---|---|---|---|",
+        *[f"| {STRATEGY_LABELS[s]} | {auc_cell(s, 'auc_flow')} | {auc_cell(s, 'auc_reachability')} | {f_c_cell(s)} |"
+          for s in sorted(STRATEGIES, key=lambda s: scores[s]["auc_flow"])],
+        "",
+        f"Across the {trials} random trials, flow capacity AUC ranges from {spread(random_scores['auc_flow_trials'])}, "
+        f"reachability AUC from {spread(random_scores['auc_reachability_trials'])}, and f_c from "
+        f"{spread(f_c['random']['f_c_trials'])}.",
+        "",
+        "".join(ranking),
+        "",
+        f"Pre-registered check that every targeted strategy scores below the random mean on both metrics: {check}",
+        "",
+        "## Null model",
+        "",
+        "These scores describe one graph. Whether they are lower than the scores of degree-preserving randomized "
+        "graphs, the pre-registered headline test, is reported in [null_model_validation.md](null_model_validation.md).",
+        "",
+        "## Figure",
+        "",
+        "![Flow capacity and reachable sensory-motor pairs under each removal strategy](percolation_curves.png)",
+        "",
+        f"Left: flow capacity. Right: reachable sensory-motor pairs. Both are shown as a fraction of the intact value "
+        f"over the first {pct(end)} of removals; random removal is the mean of {trials} trials with its 95% "
+        "confidence band.",
+        "",
+    ]
+
+
+def write_report(summary: dict, thresholds: dict, runs: dict) -> None:
+    """Write ``fragility_scores.md`` from the scores, the critical thresholds and the runs they were computed on."""
+    batches = auc_window(runs[("random", 0)]["fraction_removed"]) - 1
+    lines = report_lines(summary, thresholds, batches)
+    SCORES_MD.write_text("\n".join(lines), encoding="utf-8")
+    print("\n".join(lines))
+
+
 def plot(runs: dict, scores: dict, intact_flow: int, intact_pairs: int) -> None:
     apply_style()
     fig, axes = plt.subplots(1, 2, figsize=(12.5, 5.0), dpi=200, sharex=True)
@@ -163,7 +322,19 @@ def plot(runs: dict, scores: dict, intact_flow: int, intact_pairs: int) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workers", type=int, default=12)
+    parser.add_argument("--from-results", action="store_true",
+                        help="rebuild the report and figure from results/fragility_scores.json, "
+                             "results/percolation_curves.csv and results/critical_thresholds.json without rerunning "
+                             "percolation")
     args = parser.parse_args()
+
+    if args.from_results:
+        summary = json.loads(SCORES_JSON.read_text(encoding="utf-8"))
+        graph = summary["graph"]
+        runs = runs_from_curves(pd.read_csv(CURVES_CSV), graph["cell_types"])
+        plot(runs, summary["strategies"], graph["intact_flow"], graph["intact_reachable_pairs"])
+        write_report(summary, json.loads(THRESHOLDS_JSON.read_text(encoding="utf-8")), runs)
+        return
 
     graph = load_type_graph()
     sources, targets = load_sensory_motor_sets()

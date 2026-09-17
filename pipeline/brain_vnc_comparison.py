@@ -14,7 +14,8 @@ from pipeline.critical_thresholds import critical_fraction
 from pipeline.figures import INK_SECONDARY, STRATEGY_COLORS, apply_style, plt
 from pipeline.identify_sensory_motor_sets import load_sensory_motor_sets
 from pipeline.removal_strategies import MAX_FRACTION, STRATEGIES, STRATEGY_LABELS
-from pipeline.run_percolation import RANDOM_TRIALS, TARGETED, auc_window, mean_ci95, run_protocol, score_runs
+from pipeline.run_percolation import (RANDOM_TRIALS, TARGETED, auc_window, load_all_runs, mean_ci95, run_protocol,
+                                      score_runs)
 
 BRAIN_ROIS = ("CentralBrain", "Optic(L)", "Optic(R)")
 VNC_ROIS = ("VNC",)
@@ -83,7 +84,15 @@ def plot(results: dict) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--from-results", action="store_true",
+                        help="redraw the figure from results/brain_vnc_comparison.json and the cached runs without "
+                             "rerunning percolation")
     args = parser.parse_args()
+
+    if args.from_results:
+        summary = json.loads((RESULTS / "brain_vnc_comparison.json").read_text(encoding="utf-8"))
+        plot({c: {**summary["compartments"][c], "runs": load_all_runs(RUNS_ROOT / c)} for c in COMPARTMENTS})
+        return
 
     graph = load_type_graph()
     sources, targets = load_sensory_motor_sets()
@@ -170,7 +179,7 @@ def main() -> None:
             value = r["scores"][s][key]
             if s == "random":
                 lo, hi = r["scores"][s][f"{key}_ci95"]
-                return f"{value:.3f} ({lo:.3f}–{hi:.3f})"
+                return f"{value:.3f} ({lo:.3f} to {hi:.3f})"
             return f"{value:.3f}"
         lines.append(f"| {STRATEGY_LABELS[s]} | {cell(b, 'auc_flow')} | {cell(v, 'auc_flow')} | "
                      f"{cell(b, 'auc_reachability')} | {cell(v, 'auc_reachability')} | {b['f_c'][s]:.3f} | {v['f_c'][s]:.3f} |")
