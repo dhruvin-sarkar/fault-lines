@@ -1,21 +1,32 @@
+import re
+
 import numpy as np
 import pandas as pd
 import pytest
 
+from pipeline.common import ROOT
 from pipeline.poster import (
+    FIGURE_LAYOUT,
+    FIGURE_TITLES,
+    NBSP,
+    README_FIGURE_COUNT,
+    README_FIGURES,
     atlas_bounds,
     ccdf,
     column_edges,
     count,
     disk,
+    figure_numbers,
     fit_box,
     half_flow_batch,
+    limitations,
     linear,
     log1p_scale,
     ordinal,
     p_value,
     parse_markup,
     pct,
+    placed_note,
     split_cells,
     spread_labels,
     svg_path,
@@ -148,3 +159,76 @@ def test_disk_kernel_is_round_and_odd_sized():
     assert kernel[0, 0] == 0
     assert np.array_equal(kernel, kernel.T)
     assert disk(1).tolist() == [[1.0]]
+
+
+def test_a_no_break_space_keeps_its_neighbours_in_one_word():
+    words = parse_markup(f"Red: p{NBSP}<{NBSP}0.05 over draws")
+    assert words[1] == [(f"p{NBSP}<{NBSP}0.05", "regular")]
+    assert len(words) == 4
+
+
+def test_shared_figures_keep_their_numbers_and_the_rest_follow_in_reading_order():
+    layout = (("a", "b"), ("c", "x"), ("y",))
+    assert figure_numbers(layout, {"a": 1, "b": 2, "c": 4}, after=6) == {"a": 1, "b": 2, "c": 4, "x": 7, "y": 8}
+    assert figure_numbers((("a", "b"),), {}, after=0) == {"a": 1, "b": 2}
+
+
+def test_figure_numbers_must_rise_in_reading_order():
+    with pytest.raises(ValueError):
+        figure_numbers((("b", "a"),), {"a": 1, "b": 2}, after=2)
+    with pytest.raises(ValueError):
+        figure_numbers((("x", "a"),), {"a": 1}, after=3)
+
+
+def test_every_poster_figure_has_a_title_and_a_place():
+    assert set(figure_numbers()) == set(FIGURE_TITLES) == {key for column in FIGURE_LAYOUT for key in column}
+
+
+def readme_figure_numbers() -> dict[str, int]:
+    """README figure number per figure asset name, e.g. {'curves': 1}, read from each image's alt text."""
+    text = (ROOT / "README.md").read_text(encoding="utf-8")
+    pairs = re.findall(r'assets/readme/fig-([a-z]+)-light\.svg"[^>]*?alt="Figure (\d+)\.', text)
+    return {name: int(n) for name, n in pairs}
+
+
+def test_poster_figure_numbers_agree_with_the_readme():
+    readme = readme_figure_numbers()
+    poster = figure_numbers()
+    assert readme, "no numbered figures found in the README"
+    assert README_FIGURES == {key: n for key, n in readme.items() if key in poster}
+    assert README_FIGURE_COUNT == max(readme.values())
+    assert all(poster[key] > max(readme.values()) for key in set(poster) - set(readme))
+
+
+def limitation_data(null_model=None) -> dict:
+    tests = {"primary": {"sm_betweenness": {"n_curated": 14, "p_value": 0.04538707}},
+             "with_positive_control": {"sm_betweenness": {"n_curated": 15, "p_value": 0.10159}}}
+    return {"literature": {"tests": tests, "curated_types": {"DNp01": {}, "MDN": {}, "MN9": {}}},
+            "null_model": null_model, "planned_nulls": 200}
+
+
+def test_limitations_take_their_numbers_from_the_results():
+    text = " ".join(f"{lead} {body}" for lead, body in limitations(limitation_data())).replace(NBSP, " ")
+    assert "14 well-studied cell types" in text
+    assert "p = 0.045, and 0.10 with MN9" in text
+    for topic in ("no synaptic sign", "not silencing", "annotations", "edge-disjoint", "power law"):
+        assert topic in text
+
+
+def test_limitations_report_the_null_model_as_pending_only_until_it_exists():
+    pending = limitations(limitation_data())
+    done = limitations(limitation_data(null_model={"n_nulls": 200}))
+    assert pending[-1][0] == "Null model pending."
+    assert "200 degree-preserving" in pending[-1][1]
+    assert all("pending" not in lead.lower() for lead, _ in done)
+    assert len(done) == len(pending)
+
+
+def test_limitation_copy_avoids_dashes_and_middle_dots():
+    for data in (limitation_data(), limitation_data(null_model={"n_nulls": 200})):
+        for lead, body in limitations(data):
+            assert not {chr(0x2013), chr(0x2014), chr(0xB7)} & set(lead + body)
+
+
+def test_placed_note_states_the_placed_count_against_all_types():
+    assert placed_note(11750, 11751) == "11,750 of 11,751 types placed"

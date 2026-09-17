@@ -30,7 +30,7 @@ GUTTER = 88
 COLUMNS = 3
 BAND_HEIGHT = 1270
 METHODS_HEIGHT = 230
-COLUMN_TOP = BAND_HEIGHT + METHODS_HEIGHT + 175
+COLUMN_TOP = BAND_HEIGHT + METHODS_HEIGHT + 160
 CHECKS_TOP = 3930
 FOOTER_TOP = 4580
 OUT_DIR = ASSETS / "readme"
@@ -94,6 +94,27 @@ SUPERCLASS_NAMES = {
     "vnc_efferent": "nerve cord efferent",
 }
 
+# Short titles of the poster's figures, keyed by the README figure name (fig-<key>) where the README shows it too.
+FIGURE_TITLES = {
+    "curves": "Every targeted order collapses routing long before random removal does.",
+    "thresholds": "Random removal needs {ratio} times as many cell types as removal by output synapses.",
+    "regions": "The gnathal ganglia carry the most routing of any neuropil.",
+    "classes": "Ascending neuron types carry far more routing than their number predicts.",
+    "compartments": "What is critical depends on the circuit.",
+    "connections": "Synapse count is not routing capacity.",
+    "disconnection": "Routing thins before anything is cut off.",
+}
+# README figure numbers of the figures the poster shares with it, and how many figures the README has.
+README_FIGURES = {"curves": 1, "thresholds": 2, "regions": 3, "classes": 4, "compartments": 5, "connections": 6}
+README_FIGURE_COUNT = 8
+FINDINGS = (
+    "Sensory-to-motor routing in this wiring diagram tolerates random loss and fails fast under targeted loss.",
+    "Capacity thins long before types are cut off.",
+    "Which types are critical depends on the circuit and the measure.",
+)
+# Figures per column, top to bottom.
+FIGURE_LAYOUT = (("curves", "thresholds"), ("regions", "classes", "compartments"), ("connections", "disconnection"))
+
 FONTSOURCE = ROOT / "web" / "node_modules" / "@fontsource-variable"
 FONT_DIR = DATA / "fonts" / "poster"
 SERIF_ROMAN = "source-serif-4/files/source-serif-4-latin-opsz-normal.woff2"
@@ -123,6 +144,26 @@ def column_edges(width: float, margin: float, gutter: float, n: int) -> list[tup
     """Left and right edge of each of ``n`` equal columns between the margins."""
     column = (width - 2 * margin - (n - 1) * gutter) / n
     return [(margin + i * (column + gutter), margin + i * (column + gutter) + column) for i in range(n)]
+
+
+def figure_numbers(layout=FIGURE_LAYOUT, shared=None, after: int = README_FIGURE_COUNT) -> dict[str, int]:
+    """Figure number of each poster figure.
+
+    A figure in ``shared`` keeps that number; the others are numbered from ``after + 1`` in reading order, down
+    each column and then across. Raises ValueError if the numbers do not rise in reading order.
+    """
+    shared = README_FIGURES if shared is None else shared
+    numbers, n = {}, after
+    for key in (key for column in layout for key in column):
+        if key in shared:
+            numbers[key] = shared[key]
+        else:
+            n += 1
+            numbers[key] = n
+    ordered = list(numbers.values())
+    if ordered != sorted(ordered) or len(set(ordered)) != len(ordered):
+        raise ValueError(f"figure numbers out of reading order: {numbers}")
+    return numbers
 
 
 def split_cells(x0: float, x1: float, n: int, gap: float) -> list[tuple[float, float]]:
@@ -190,7 +231,9 @@ def wrap_widths(widths: list[float], space: float, limit: float) -> list[list[in
     return lines
 
 
-MARKUP = re.compile(r"\*\*|\*|\^[^^]*\^|~[^~]*~|\s+|[^*^~\s]+")
+NBSP = "\u00a0"
+# Words break at ordinary spaces only, so a no-break space keeps "p = 0.05" on one line.
+MARKUP = re.compile(r"\*\*|\*|\^[^^]*\^|~[^~]*~|[ \t\r\n]+|[^*^~ \t\r\n]+")
 
 
 def parse_markup(text: str) -> list[list[tuple[str, str]]]:
@@ -207,7 +250,7 @@ def parse_markup(text: str) -> list[list[tuple[str, str]]]:
             bold = not bold
         elif token == "*":
             italic = not italic
-        elif token.isspace():
+        elif token[0] in " \t\r\n":
             if current:
                 words.append(current)
                 current = []
@@ -330,6 +373,39 @@ def font(role: str, size: float) -> FontProperties:
     return FontProperties(family="serif" if serif else "sans-serif", size=size,
                           weight="bold" if role.endswith("bold") else "normal",
                           style="italic" if role.endswith("italic") or role == "deck" else "normal")
+
+
+def limitations(data: dict) -> list[tuple[str, str]]:
+    """Lead and text of each limitation on the poster, with numbers taken from the results."""
+    lit = data["literature"]
+    primary = lit["tests"]["primary"]["sm_betweenness"]
+    control = lit["tests"]["with_positive_control"]["sm_betweenness"]
+    control_type = list(lit["curated_types"])[-1]
+    items = [
+        ("A static type graph.", "Synapses are summed over cell types, with no synaptic sign, no electrical synapses "
+                                 "and no dynamics."),
+        ("Removal is not silencing.", "Deleting a type from the graph does not say what a fly would do without it."),
+        ("Terminals follow annotations.", "The sensory and motor sets come from neuPrint superclass labels and "
+                                          "would change with them."),
+        ("Routes, not signal.", "Flow counts edge-disjoint paths, not how much signal passes along them."),
+        ("A small literature check.", f"{primary['n_curated']} well-studied cell types, not a random sample: "
+                                      f"p{NBSP}={NBSP}{p_value(primary['p_value'])}, and "
+                                      f"{p_value(control['p_value'])} with "
+                                      f"{control_type}."),
+        ("Cascades.", "A power law is not established; a lognormal fits the sizes as well."),
+    ]
+    if data["null_model"] is None:
+        items.append(("Null model pending.", f"The comparison with {data['planned_nulls']} degree-preserving "
+                                             "randomized graphs is not yet reported."))
+    else:
+        items.append(("What the null model keeps.", "Randomized graphs keep each type's degrees and output synapses, "
+                                                    "so the test cannot say which feature of the wiring matters."))
+    return items
+
+
+def placed_note(placed: int, types: int) -> str:
+    """How many cell types the atlas places, e.g. '11,750 of 11,751 types placed'."""
+    return f"{count(placed)} of {count(types)} types placed"
 
 
 # Drawing
@@ -631,7 +707,12 @@ def heading(sheet: Sheet, x0, y, text) -> float:
     return y + 84
 
 
-def figure_percolation(sheet: Sheet, data: dict, x0, x1, y) -> float:
+def figure_label(key: str, numbers: dict[str, int], **values) -> str:
+    """Bold caption lead of a poster figure, e.g. 'Figure 3. The gnathal ganglia carry ...'."""
+    return f"Figure {numbers[key]}. {FIGURE_TITLES[key].format(**values)}"
+
+
+def figure_percolation(sheet: Sheet, data: dict, x0, x1, y, numbers: dict[str, int]) -> float:
     intact = data["thresholds"]["intact_flow"]
     curves = strategy_curves(data["curves"], intact)
     fc = data["thresholds"]["strategies"]
@@ -651,26 +732,48 @@ def figure_percolation(sheet: Sheet, data: dict, x0, x1, y) -> float:
                    5 if strategy == "out_strength" else 3.2, zorder=5, cap="round")
     for strategy in STRATEGY_ORDER:
         sheet.dot(float(frame.sx(fc[strategy]["f_c"])), half, 11, STRATEGY_COLORS[strategy], zorder=8)
-    y = bottom + 136
-    cells = split_cells(x0, x1, 2, 30)
-    for i, strategy in enumerate(STRATEGY_ORDER):
-        cx0, cx1 = cells[i % 2]
-        row_y = y + (i // 2) * 46
-        sheet.line([cx0, cx0 + 32], [row_y - 9, row_y - 9], STRATEGY_COLORS[strategy], 6)
-        sheet.text(cx0 + 46, row_y, STRATEGY_NAMES[strategy], LABEL, "sans", INK)
-        sheet.text(cx1, row_y, pct(fc[strategy]["f_c"]), LABEL, "sans_bold", STRATEGY_INK[strategy], ha="right")
-    y += 2 * 46 + 66
+    return caption(sheet, x0, x1, bottom + 152, figure_label("curves", numbers),
+                   "Batches of 1% of remaining types, scores recomputed each time; dots mark where flow halves. "
+                   f"Random: mean of {len(fc['random']['f_c_trials'])} runs and 95% band.")
+
+
+def figure_thresholds(sheet: Sheet, data: dict, x0, x1, y, numbers: dict[str, int]) -> float:
+    fc = data["thresholds"]["strategies"]
+    trials = fc["random"]["f_c_trials"]
+    order = sorted(STRATEGY_ORDER, key=lambda s: fc[s]["f_c"])
+    chart_title(sheet, x0, x1, y, "Types removed when flow first halves")
+    lx = x1 - sheet.width_of("random runs", TICK, "sans")
+    sheet.text(lx, y, "random runs", TICK, "sans", INK_2)
+    sheet.rect(lx - 34, y - 24, lx - 12, y + 4, RULE, zorder=6)
+    top, row = y + 30, 38
+    bottom = top + row * len(order)
+    sx = linear(0, 0.35, x0 + 440, x1 - 120)
+    sheet.rect(float(sx(min(trials))), top, float(sx(max(trials))), bottom, RULE, zorder=1)
+    for t in (0, 0.1, 0.2, 0.3):
+        sheet.line([sx(t), sx(t)], [top, bottom], RULE_STRONG if min(trials) <= t <= max(trials) else RULE, 1.5,
+                   zorder=2)
+        sheet.text(float(sx(t)), bottom + 40, pct(t, 0), TICK, "sans", INK_3, ha="center")
+    for i, strategy in enumerate(order):
+        cy = top + row * i + row / 2
+        sheet.line([x0, x0 + 32], [cy, cy], STRATEGY_COLORS[strategy], 6)
+        sheet.text(x0 + 46, cy + 9, STRATEGY_NAMES[strategy], LABEL, "sans", INK)
+        sheet.dot(float(sx(fc[strategy]["f_c"])), cy, 12, STRATEGY_COLORS[strategy], hollow=strategy == "random",
+                  stroke=4.5)
+        sheet.text(x1, cy + 9, pct(fc[strategy]["f_c"]), LABEL, "sans_bold", STRATEGY_INK[strategy], ha="right")
+    targeted = [fc[s]["f_c"] for s in STRATEGY_ORDER if s != "random"]
+    below = "every targeted order lies below that range" if max(targeted) < min(trials) else \
+        "not every targeted order lies below that range"
     lo, hi = fc["random"]["f_c_ci95"]
-    return caption(sheet, x0, x1, y, "Figure 1. Targeted removal halves routing within a few percent of types.",
-                   "Batches of 1% of the remaining types, scores recomputed each time; dots mark where flow halves. "
-                   f"Random: mean of {len(fc['random']['f_c_trials'])} runs, 95% band, threshold CI {pct(lo)} to "
-                   f"{pct(hi)}.")
+    ratio = f"{fc['random']['f_c'] / fc['out_strength']['f_c']:.1f}"
+    return caption(sheet, x0, x1, bottom + 96, figure_label("thresholds", numbers, ratio=ratio),
+                   f"Shaded: the {len(trials)} random runs, {pct(min(trials))} to {pct(max(trials))} (mean "
+                   f"{pct(fc['random']['f_c'])}, 95% CI {pct(lo)} to {pct(hi)}); {below}.")
 
 
-def figure_compartments(sheet: Sheet, data: dict, x0, x1, y) -> float:
+def figure_compartments(sheet: Sheet, data: dict, x0, x1, y, numbers: dict[str, int]) -> float:
     comp = data["compartments"]["compartments"]
     brain, vnc = comp["brain"]["f_c"], comp["vnc"]["f_c"]
-    chart_title(sheet, x0, x1, y, "Types removed when flow halves")
+    chart_title(sheet, x0, x1, y, "Types removed when flow halves, by subgraph")
     lx = x1 - sheet.width_of("nerve cord", TICK, "sans")
     sheet.text(lx, y, "nerve cord", TICK, "sans", INK_2)
     sheet.dot(lx - 24, y - 9, 11, INK_2)
@@ -690,14 +793,14 @@ def figure_compartments(sheet: Sheet, data: dict, x0, x1, y) -> float:
         sheet.line([a, b], [cy, cy], STRATEGY_COLORS[strategy], 5, alpha=0.5, zorder=4)
         sheet.dot(a, cy, 12, STRATEGY_COLORS[strategy], hollow=True, stroke=4.5)
         sheet.dot(b, cy, 12, STRATEGY_COLORS[strategy])
-    return caption(sheet, x0, x1, bottom + 96, "Figure 2. The most damaging order depends on the circuit.",
+    return caption(sheet, x0, x1, bottom + 96, figure_label("compartments", numbers),
                    f"The same protocol on the {count(comp['brain']['types'])} brain and "
                    f"{count(comp['vnc']['types'])} nerve cord types. Sensory-motor betweenness halves brain flow after "
                    f"{pct(brain['sm_betweenness'])} of types and nerve cord flow after {pct(vnc['sm_betweenness'])}; "
                    f"weighted in-degree does the reverse ({pct(brain['in_strength'])} and {pct(vnc['in_strength'])}).")
 
 
-def figure_edges(sheet: Sheet, data: dict, x0, x1, y) -> float:
+def figure_edges(sheet: Sheet, data: dict, x0, x1, y, numbers: dict[str, int]) -> float:
     edges = data["edges"]
     orders = edges["orders"]
     colors = {"strongest": "out_strength", "weakest": "pagerank", "random": "random"}
@@ -722,14 +825,14 @@ def figure_edges(sheet: Sheet, data: dict, x0, x1, y) -> float:
         sheet.text(frame.x1 + 22, ypos + 9, names[order], LABEL, "sans_medium", STRATEGY_INK[colors[order]])
     strongest, random = orders["strongest"], orders["random"]
     lo, hi = random["critical_fraction_range"]
-    return caption(sheet, x0, x1, bottom + 136, "Figure 3. Heavy connections carry more routes, not all of them.",
+    return caption(sheet, x0, x1, bottom + 136, figure_label("connections", numbers),
                    f"With the strongest of {count(edges['edges'])} connections removed first, flow halves after "
                    f"{pct(strongest['critical_fraction'])}; in random order, after {pct(random['critical_fraction'])} "
                    f"({len(random['critical_fraction_trials'])} runs, {pct(lo)} to {pct(hi)}). Weakest first never "
                    "halves it within half of all connections.")
 
 
-def figure_superclasses(sheet: Sheet, data: dict, x0, x1, y) -> float:
+def figure_superclasses(sheet: Sheet, data: dict, x0, x1, y, numbers: dict[str, int]) -> float:
     rows = data["structure"]["superclass_impact"]
     chart_title(sheet, x0, x1, y, "Flow lost when a whole superclass is removed")
     lx = x1 - sheet.width_of("same-size random", TICK, "sans")
@@ -754,15 +857,14 @@ def figure_superclasses(sheet: Sheet, data: dict, x0, x1, y) -> float:
                    SIGNAL if strong else INK_3, ha="right")
     dn = next(r for r in rows if r["superclass"] == "descending_neuron")
     an = next(r for r in rows if r["superclass"] == "ascending_neuron")
-    return caption(sheet, x0, x1, bottom + 96,
-                   "Figure 4. Ascending neurons, neither source nor sink, cost a third of the routes.",
-                   f"All {count(an['types'])} ascending neuron types cost {pct(an['flow_drop'])} of flow; random "
+    return caption(sheet, x0, x1, bottom + 96, figure_label("classes", numbers),
+                   f"Neither sources nor sinks, all {count(an['types'])} ascending neuron types cost {pct(an['flow_drop'])} of flow; random "
                    f"sets of the same size cost {pct(an['random_mean'])}. The {count(dn['types'])} descending types "
                    f"cost {pct(dn['flow_drop'])} against {pct(dn['random_mean'])}, largely because they are sinks. "
-                   f"Red: one-sided p < 0.05 over {data['structure']['random_draws']} draws.")
+                   f"Red: one-sided p{NBSP}<{NBSP}0.05 over {data['structure']['random_draws']} draws.")
 
 
-def figure_disconnection(sheet: Sheet, data: dict, x0, x1, y) -> float:
+def figure_disconnection(sheet: Sheet, data: dict, x0, x1, y, numbers: dict[str, int]) -> float:
     replay = data["atlas"]["replay"]
     at_half = cut_off_at_half_flow(data)
     chart_title(sheet, x0, x1, y, "Surviving types with no path from sensory input")
@@ -781,14 +883,14 @@ def figure_disconnection(sheet: Sheet, data: dict, x0, x1, y) -> float:
                f"one batch cuts off {count(jumps[j])}", LABEL, "sans_medium", STRATEGY_INK["sm_betweenness"],
                ha="right")
     worst = max(v for v in at_half.values() if v is not None)
-    return caption(sheet, x0, x1, bottom + 136, "Figure 5. Routing thins before anything is cut off.",
+    return caption(sheet, x0, x1, bottom + 136, figure_label("disconnection", numbers),
                    f"When flow halves, at most {count(worst)} of {count(data['atlas']['types'])} types have lost every "
                    f"sensory path, whatever the order. Under sensory-motor betweenness one batch, from "
                    f"{pct(sm['fraction_removed'][j])} to {pct(sm['fraction_removed'][j + 1])} removed, cuts off "
-                   f"{count(jumps[j])} types at once. Colours as in Figure 1.")
+                   f"{count(jumps[j])} types at once. Colours as in Figure {numbers['thresholds']}.")
 
 
-def figure_regions(sheet: Sheet, data: dict, x0, x1, y, n: int = 6) -> float:
+def figure_regions(sheet: Sheet, data: dict, x0, x1, y, numbers: dict[str, int], n: int = 6) -> float:
     regions = data["regions"].sort_values("flow_drop", ascending=False).head(n)
     chart_title(sheet, x0, x1, y, "Flow lost when a neuropil's types are removed")
     lx = x1 - sheet.width_of("same-size random", TICK, "sans")
@@ -812,31 +914,22 @@ def figure_regions(sheet: Sheet, data: dict, x0, x1, y, n: int = 6) -> float:
                    SIGNAL if strong else INK_3, ha="right")
     first = regions.iloc[0]
     significant = int((data["regions"]["p_value"] < 0.05).sum())
-    return caption(sheet, x0, x1, bottom + 96, "Figure 6. The gnathal ganglia hold the most routes.",
+    return caption(sheet, x0, x1, bottom + 96, figure_label("regions", numbers),
                    f"Each type is anchored to the neuropil with most of its synapses. Removing the "
                    f"{count(first.n_types)} types of the {first.neuropil} costs {pct(first.flow_drop)} of flow, against "
                    f"{pct(first.random_mean)} for random sets of that size. {significant} of {len(data['regions'])} "
-                   "neuropils reach p < 0.05, uncorrected; exploratory.")
+                   f"neuropils reach p{NBSP}<{NBSP}0.05, uncorrected; exploratory.")
 
 
-def figure_core(sheet: Sheet, data: dict, x0, x1, y) -> float:
-    s = data["structure"]
-    counts = {int(k): v for k, v in s["coreness_counts"].items()}
-    kmax = s["max_coreness"]
-    chart_title(sheet, x0, x1, y, "Cell types by core number")
-    top, bottom = y + 50, y + 290
-    frame = axis_frame(sheet, x0 + 100, top, x1, bottom, (-0.5, kmax + 0.5), (0, 10000), [0, 5, 10, 15, 20],
-                       [0, 10, 100, 1000, 10000], lambda t: str(int(t)), count,
-                       yscale=log1p_scale(10000, bottom, top))
-    bar = (frame.x1 - frame.x0) / (kmax + 1) * 0.7
-    for k, v in counts.items():
-        cx = float(frame.sx(k))
-        sheet.rect(cx - bar / 2, float(frame.sy(v)), cx + bar / 2, bottom, INK if k == kmax else RULE_STRONG,
-                   zorder=3)
-    cx = float(frame.sx(kmax))
-    sheet.text(cx - bar, float(frame.sy(counts[kmax])) + 26, f"{count(counts[kmax])} types, k = {kmax}", LABEL,
-               "sans_bold", INK, ha="right")
-    return bottom + 44
+FIGURE_DRAW = {
+    "curves": figure_percolation,
+    "thresholds": figure_thresholds,
+    "regions": figure_regions,
+    "classes": figure_superclasses,
+    "compartments": figure_compartments,
+    "connections": figure_edges,
+    "disconnection": figure_disconnection,
+}
 
 
 # Mini charts for the checks strip
@@ -955,7 +1048,8 @@ def draw_band(sheet: Sheet, data: dict, edges) -> None:
         ("#d8dee1", f"**{count(counts['silenced'])} surviving types** already cut off from every sensory type"),
     ]
     y = 660
-    y = sheet.paragraph(lx0, y, lx1 - lx0, "The male CNS seen from the front, brain above, nerve cord below.",
+    y = sheet.paragraph(lx0, y, lx1 - lx0, "The male CNS seen from the front, brain above, nerve cord below; "
+                        f"{placed_note(counts['placed'], data['atlas']['types'])}.",
                         29, "sans", FIELD_INK_2, leading=1.36) + 30
     for color, text in legend:
         sheet.dot(lx0 + 11, y - 10, 11, color, ground=FIELD)
@@ -974,7 +1068,8 @@ def draw_methods(sheet: Sheet, data: dict) -> None:
                   "target's input"),
         ("Terminals", f"{count(g['sensory_types'])} sensory sources, {count(g['motor_types'])} descending and "
                       "motor sinks"),
-        ("Measure", f"flow capacity: {count(g['intact_flow'])} edge-disjoint sensory-to-motor paths when intact"),
+        ("Measure", f"flow capacity *F*: {count(g['intact_flow'])} edge-disjoint sensory-to-motor paths when "
+                    "intact^3^"),
         ("Remove", f"six orders, {pct(fr['protocol']['batch_fraction_of_remaining'], 0)} of remaining types a "
                    f"batch, scores recomputed, {fr['protocol']['random_trials']} random runs"),
         ("Validate", f"plan committed first; {data['planned_nulls']} degree-preserving nulls; "
@@ -987,70 +1082,45 @@ def draw_methods(sheet: Sheet, data: dict) -> None:
         sheet.paragraph(cx0 + 52, y + 134, cx1 - cx0 - 52, body, 27, "sans", INK_2, leading=1.36)
 
 
-def draw_column_one(sheet: Sheet, data: dict, x0, x1, y) -> float:
-    g = data["fragility"]["graph"]
+def draw_column_one(sheet: Sheet, data: dict, x0, x1, y, numbers: dict[str, int]) -> float:
     th = data["thresholds"]["strategies"]
     y = heading(sheet, x0, y, "Question")
     y = sheet.paragraph(x0, y + 8, x1 - x0,
-                        "A nervous system must carry signals from the senses to the neurons that move the body. How "
-                        "much of that routing survives when parts of the wiring are lost, and does the order of loss "
-                        "matter? The complete connectome of a male fruit fly, brain and nerve cord together,^1^ was "
+                        "How much of the routing from the senses to the neurons that move the body survives when "
+                        "wiring is lost, and does the order of loss matter? The complete connectome of a male fruit fly, brain and nerve cord together,^1^ was "
                         "attacked in six orders fixed in advance. Removing the types with the most output synapses "
                         f"halves routing after {pct(th['out_strength']['f_c'])} of types; random loss needs "
                         f"{pct(th['random']['f_c'])}, the gap Albert et al. (2000) described for the Internet and the "
                         "Web.^2^",
                         37, "serif", INK, leading=1.42)
 
-    y = heading(sheet, x0, y + 84, "The graph")
-    y = sheet.paragraph(x0, y + 8, x1 - x0,
-                        f"Synapses between {count(TYPED_NEURONS)} typed neurons were summed into "
-                        f"{count(g['cell_types'])} cell types, keeping {count(g['edges'])} connections that supply at "
-                        "least 1% of a type's input. Routing is the flow capacity *F*: the most edge-disjoint paths "
-                        "from sensory to descending and motor types.^3^", 37, "serif", INK, leading=1.42)
-    s = data["structure"]
-    tail = next(t for t in s["degree_tails"] if t["measure"].startswith("out-strength"))
-    y = figure_core(sheet, data, x0, x1, y + 30)
-    y = caption(sheet, x0, x1, y + 80, "Figure 7. A dense core with a thin rim.",
-                f"{pct(s['types_in_deepest_core'] / s['types'])} of types share the deepest core. Output ranges from "
-                f"a median of {count(tail['median'])} to {count(tail['max'])} synapses per type, a heavy tail better "
-                "fit by a truncated than a pure power law:^4^ targeting works without the graph being scale-free.")
+    y += 40
+    sheet.text(x0, y, "What this shows", CAPTION, "sans_bold", INK)
+    sheet.line([x0, x1], [y + 22, y + 22], RULE_STRONG, 2)
+    y += 72
+    for item in FINDINGS:
+        y = sheet.paragraph(x0, y, x1 - x0, item, CAPTION, "sans", INK_2, leading=1.38) + 14
 
-    y = heading(sheet, x0, y + 100, "Scope of the claims")
-    shows = [
-        "Sensory-to-motor routing in this wiring diagram tolerates random loss and fails fast under targeted loss.",
-        "Capacity thins long before types are cut off.",
-        "Which types are critical depends on the circuit and the measure.",
-    ]
-    limits = [
-        "What a fly would do without these types: no activity is simulated.",
-        "Synaptic sign, electrical synapses, modulation or plasticity.",
-        "Other animals, or resolution finer than the cell type.",
-    ]
-    ends = []
-    for (cx0, cx1), title, items in zip(split_cells(x0, x1, 2, 50), ("What this shows", "What this does not show"),
-                                        (shows, limits)):
-        yy = y + 8
-        sheet.text(cx0, yy, title, CAPTION, "sans_bold", INK)
-        sheet.line([cx0, cx1], [yy + 22, yy + 22], RULE_STRONG, 2)
-        yy += 72
-        for item in items:
-            yy = sheet.paragraph(cx0, yy, cx1 - cx0, item, CAPTION, "sans", INK_2, leading=1.38) + 14
-        ends.append(yy)
-    return max(ends)
+    y = heading(sheet, x0, y + 72, "Results")
+    for i, key in enumerate(FIGURE_LAYOUT[0]):
+        y = FIGURE_DRAW[key](sheet, data, x0, x1, y + (36 if i == 0 else 56), numbers)
+    return y
 
 
-def draw_column_two(sheet: Sheet, data: dict, x0, x1, y) -> float:
-    y = heading(sheet, x0, y, "Results")
-    y = figure_percolation(sheet, data, x0, x1, y + 36)
-    y = figure_compartments(sheet, data, x0, x1, y + 56)
-    return figure_edges(sheet, data, x0, x1, y + 56)
+def draw_figure_column(sheet: Sheet, data: dict, x0, x1, y, numbers: dict[str, int], title: str,
+                       keys: tuple[str, ...]) -> float:
+    y = heading(sheet, x0, y, title)
+    for i, key in enumerate(keys):
+        y = FIGURE_DRAW[key](sheet, data, x0, x1, y + (36 if i == 0 else 56), numbers)
+    return y
 
 
-def draw_column_three(sheet: Sheet, data: dict, x0, x1, y) -> float:
-    y = heading(sheet, x0, y, "Where routing breaks")
-    y = figure_superclasses(sheet, data, x0, x1, y + 36)
-    y = figure_disconnection(sheet, data, x0, x1, y + 56)
-    return figure_regions(sheet, data, x0, x1, y + 56)
+def draw_limitations(sheet: Sheet, data: dict, x0, x1, y) -> float:
+    y = heading(sheet, x0, y, "Where it falls short") + 16
+    for lead, text in limitations(data):
+        y = sheet.paragraph(x0, y, x1 - x0, f"**{lead}** {text}", CAPTION, "sans", INK_2, leading=1.38,
+                            colors={"bold": INK}) + 14
+    return y
 
 
 def draw_checks(sheet: Sheet, data: dict) -> float:
@@ -1071,11 +1141,11 @@ def draw_checks(sheet: Sheet, data: dict) -> float:
     cells.append((
         "Published cell types rank high", f"p = {p_value(primary['p_value'])}",
         lambda a, b, t: mini_strip(sheet, a, b, t, [v["sm_betweenness_percentile"] for v in
-                                                    lit["curated_types"].values()],
+                                                    list(lit["curated_types"].values())[:primary["n_curated"]]],
                                    primary["median_percentile"], SIGNAL),
         f"{primary['n_curated']} behaviorally validated types sit at a median "
         f"{ordinal(round(primary['median_percentile']))} percentile of sensory-motor betweenness; "
-        f"p = {p_value(control['p_value'])} with the motor neuron control.",
+        f"p{NBSP}={NBSP}{p_value(control['p_value'])} with the motor neuron control.",
     ))
     cells.append((
         "A hidden bottleneck", example["cell_type"],
@@ -1185,8 +1255,13 @@ def render(output: Path = POSTER_PATH, preview: Path = PREVIEW_PATH) -> None:
     edges = column_edges(WIDTH, MARGIN, GUTTER, COLUMNS)
     draw_band(sheet, data, edges)
     draw_methods(sheet, data)
-    bottoms = [draw(sheet, data, *edge, COLUMN_TOP)
-               for draw, edge in zip((draw_column_one, draw_column_two, draw_column_three), edges)]
+    numbers = figure_numbers()
+    bottoms = [
+        draw_column_one(sheet, data, *edges[0], COLUMN_TOP, numbers),
+        draw_figure_column(sheet, data, *edges[1], COLUMN_TOP, numbers, "Where routing breaks", FIGURE_LAYOUT[1]),
+    ]
+    y = draw_figure_column(sheet, data, *edges[2], COLUMN_TOP, numbers, "How routing fails", FIGURE_LAYOUT[2])
+    bottoms.append(draw_limitations(sheet, data, *edges[2], y + 100))
     checks_bottom = draw_checks(sheet, data)
     draw_footer(sheet)
     print(f"Column bottoms {[round(b) for b in bottoms]} (checks start {CHECKS_TOP}); "
