@@ -755,11 +755,11 @@ def figure_superclasses(sheet: Sheet, data: dict, x0, x1, y) -> float:
     dn = next(r for r in rows if r["superclass"] == "descending_neuron")
     an = next(r for r in rows if r["superclass"] == "ascending_neuron")
     return caption(sheet, x0, x1, bottom + 96,
-                   "Figure 4. Without the descending neurons, two thirds of the routes go.",
-                   f"All {count(dn['types'])} descending neuron types cost {pct(dn['flow_drop'])} of flow; random "
-                   f"sets of the same size cost {pct(dn['random_mean'])}. Ascending neurons, neither source nor sink, "
-                   f"cost {pct(an['flow_drop'])} against {pct(an['random_mean'])}. Red: one-sided p < 0.05 over "
-                   f"{data['structure']['random_draws']} draws.")
+                   "Figure 4. Ascending neurons, neither source nor sink, cost a third of the routes.",
+                   f"All {count(an['types'])} ascending neuron types cost {pct(an['flow_drop'])} of flow; random "
+                   f"sets of the same size cost {pct(an['random_mean'])}. The {count(dn['types'])} descending types "
+                   f"cost {pct(dn['flow_drop'])} against {pct(dn['random_mean'])}, largely because they are sinks. "
+                   f"Red: one-sided p < 0.05 over {data['structure']['random_draws']} draws.")
 
 
 def figure_disconnection(sheet: Sheet, data: dict, x0, x1, y) -> float:
@@ -997,7 +997,8 @@ def draw_column_one(sheet: Sheet, data: dict, x0, x1, y) -> float:
                         "matter? The complete connectome of a male fruit fly, brain and nerve cord together,^1^ was "
                         "attacked in six orders fixed in advance. Removing the types with the most output synapses "
                         f"halves routing after {pct(th['out_strength']['f_c'])} of types; random loss needs "
-                        f"{pct(th['random']['f_c'])}, the gap first seen in the Internet and the Web.^2^",
+                        f"{pct(th['random']['f_c'])}, the gap Albert et al. (2000) described for the Internet and the "
+                        "Web.^2^",
                         37, "serif", INK, leading=1.42)
 
     y = heading(sheet, x0, y + 84, "The graph")
@@ -1068,7 +1069,7 @@ def draw_checks(sheet: Sheet, data: dict) -> float:
 
     cells = []
     cells.append((
-        "Published neurons rank high", f"p = {p_value(primary['p_value'])}",
+        "Published cell types rank high", f"p = {p_value(primary['p_value'])}",
         lambda a, b, t: mini_strip(sheet, a, b, t, [v["sm_betweenness_percentile"] for v in
                                                     lit["curated_types"].values()],
                                    primary["median_percentile"], SIGNAL),
@@ -1098,7 +1099,7 @@ def draw_checks(sheet: Sheet, data: dict) -> float:
     if bil:
         counts = bil["additivity_counts"]
         cells.append((
-            "Left and right back each other up", count(counts["superadditive"]),
+            "Few types' sides back each other up", count(counts["superadditive"]),
             lambda a, b, t: mini_stack(sheet, a, b, t, [("more", counts["superadditive"], SIGNAL),
                                                         ("additive", counts["additive"], RULE_STRONG),
                                                         ("less", counts["subadditive"], INK)]),

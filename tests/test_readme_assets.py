@@ -22,7 +22,8 @@ def test_linear_can_invert_an_axis():
 
 @pytest.mark.parametrize(
     ("value", "digits", "expected"),
-    [(0.04111, 1, "4.1%"), (0.28321, 1, "28.3%"), (0.5, 0, "50%"), (0.0, 1, "0.0%")],
+    [(0.04111, 1, "4.1%"), (0.28321, 1, "28.3%"), (0.5, 0, "50%"), (0.0, 1, "0.0%"), (0.2055, 1, "20.6%"),
+     (0.50251, 2, "50.25%")],
 )
 def test_pct(value, digits, expected):
     assert ra.pct(value, digits) == expected

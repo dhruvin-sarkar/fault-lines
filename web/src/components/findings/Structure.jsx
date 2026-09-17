@@ -112,7 +112,8 @@ function StructureView({ data, percolation }) {
             {count(strength.max)}. Only {count(strength.n_tail)} of {count(strength.n)} types (
             {percent(strength.n_tail / strength.n)}) send at least {count(strength.xmin)}. A ranking by weighted
             out-degree removes those few types first, and each takes far more synapses with it than a type picked at
-            random, which almost always comes from the bulk of the distribution.
+            random, which almost always comes from the bulk of the distribution. That is consistent with the ranking
+            being so damaging; whether the degree sequence accounts for it is what the null model tests.
           </p>
         )}
         {strength && verdicts && (

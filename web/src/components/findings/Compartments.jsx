@@ -81,8 +81,10 @@ function CompartmentsView({ data, meta }) {
         <p>
           {welch && (
             <>
-              {alike ? "Random removal wears both parts down alike" : "Random removal wears the two parts down differently"}
-              : the area under the flow curve {alike ? "does not differ" : "differs"} between the{" "}
+              {alike
+                ? "Under random removal, the area under the flow curve does not differ significantly"
+                : "Random removal wears the two parts down differently: the area under the flow curve differs"}{" "}
+              between the{" "}
               {trials != null ? `${count(trials)} ` : ""}brain and nerve cord trials (Welch t = {fixed(welch.auc_flow.t)}
               , p = {pValue(welch.auc_flow.p_value)}; for reachability t = {fixed(welch.auc_reachability.t)}, p ={" "}
               {pValue(welch.auc_reachability.p_value)}).{" "}

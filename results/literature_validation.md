@@ -26,7 +26,7 @@ Evidence: S = activating the neurons evokes the behavior; N = silencing or ablat
 
 Name mapping notes. `MDN` is the connectome type for the moonwalker descending neurons ("DNp50" appears only as a synonym). P9 is scored as `DNp09`, which matches the FlyWire and MANC type of the genetic line used; a second type, `DNp71`, also carries the hemibrain label DNp09 and is tested as a sensitivity check. `aSP22` is the connectome name for the descending neuron published as DNa12. For DNa02, bilateral silencing did not reduce turning, so the evidence is sufficiency only. Descending neuron nomenclature follows Namiki et al. (2018) [namiki2018].
 
-`MN9`, the positive control named in the preregistration, is kept out of the primary test. It is a motor neuron type, and its published importance lies in its motor output, not in routing signals between the sensory and motor sets, which is what the structural scores measure. It lies on no shortest sensory-to-motor route between other types, so its sensory-motor betweenness is 0 (percentile 9.8, the tied rank of every type scoring zero), and removing it alone costs 1 path of flow capacity. It is therefore not a positive control for these scores, and the sensitivity result below reports what including it does to the test.
+`MN9`, the positive control named in the preregistration, is kept out of the primary test. It is a motor neuron type, and its published importance lies in its motor output, not in routing signals between the sensory and motor sets, which is what the structural scores measure. It lies on no shortest sensory-to-motor route between other types, so its sensory-motor betweenness is 0 (percentile 9.8, the tied rank of every type scoring zero), and removing it alone costs 1 path of flow capacity. It is therefore not a positive control for these scores, and the sensitivity result below reports what including it does to the test. The pre-registration named `MN9` a positive control; that it cannot act as one for this score was recognized only after scoring.
 
 ## Test
 
@@ -38,7 +38,7 @@ One-sided Mann-Whitney U test, alternative that the curated types score higher t
 | primary (14 types) | flow capacity lost when removed alone | 14 | 61754 | 0.97 | 0.376 | 32.3 | not significant |
 | primary (14 types) | global betweenness | 14 | 136653 | 8.7e-06 | 0.832 | 94.9 | significant |
 | with MN9 | sensory-motor betweenness (primary) | 15 | 104667 | 0.1 | 0.595 | 75.1 | not significant |
-| with MN9 | flow capacity lost when removed alone | 15 | 69910 | 0.95 | 0.397 | 32.3 | not significant |
+| with MN9 | flow capacity lost when removed alone | 15 | 69910.5 | 0.95 | 0.397 | 32.3 | not significant |
 | with MN9 | global betweenness | 15 | 137346 | 8.6e-05 | 0.780 | 94.4 | significant |
 | DNp71 instead of DNp09 | sensory-motor betweenness (primary) | 14 | 108648 | 0.018 | 0.661 | 79.1 | significant |
 | DNp71 instead of DNp09 | flow capacity lost when removed alone | 14 | 61754 | 0.97 | 0.376 | 32.3 | not significant |

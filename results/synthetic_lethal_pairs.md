@@ -1,6 +1,6 @@
 # Synthetic-lethal cell-type pairs
 
-In genetics, two genes are synthetic lethal when losing either alone is tolerated but losing both is not. The structural analogue here: two cell types whose joint removal cuts sensory-to-motor flow capacity by more than the sum of what each removal does alone, because each provides the other's detour.
+In genetics, two genes are synthetic lethal when losing either alone is tolerated but losing both is not. The structural analogue here: two cell types whose joint removal cuts sensory-to-motor flow capacity by more than the sum of what each removal does alone, most often because both are sensory types feeding the same downstream capacity, so either can fill it when the other is gone.
 
 ## Procedure
 
@@ -42,4 +42,4 @@ Every row can be checked from its own numbers: joint impact = intact flow − fl
 | `SNpp45` (vnc_sensory) | `SNta29` (vnc_sensory) | 64 | 155 | 10423 | 224 | +5 |
 | `SNta29` (vnc_sensory) | `SNta28` (vnc_sensory) | 155 | 46 | 10441 | 206 | +5 |
 
-Flow capacity counts edge-disjoint paths, so a positive synergy means the two types sit on alternative routes that can substitute for each other. It is a structural statement about the wiring diagram, not a prediction of what silencing both types would do to a fly.
+Flow capacity counts edge-disjoint paths, so a positive synergy means the two types substitute for each other at the sensory entry points into shared downstream capacity; this does not show parallel pathways deeper in the circuit. It is a structural statement about the wiring diagram, not a prediction of what silencing both types would do to a fly.

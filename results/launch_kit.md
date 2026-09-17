@@ -11,13 +11,13 @@ HHMI Janelia and Google Research released the complete connectome of a male frui
 I reduced the connectome to 11,751 cell types and 243,439 connections and measured routing as flow capacity: the number of edge-disjoint paths from 368 sensory types to 665 descending and motor types, 10,647 when intact. Six removal orders were fixed in a pre-registration before any run. All five targeted orders fall below the random interval (27.7% to 28.9%).
 
 **3**
-Routing thins long before anything is cut off. When flow halves, at most 37 of 11,751 types have lost every path from sensory input, whatever the order. Then, under sensory-motor betweenness, a single batch cuts off 6,046 types at once. Once half of all types are gone, 5,306 of the 5,846 survivors have no sensory path, against 1 under random removal.
+Routing thins long before anything is cut off. When flow halves, at most 37 of 11,751 types have lost every path from sensory input, whatever the order. Then, under sensory-motor betweenness, a single batch cuts off 6,046 types at once. Once half of all types are gone, 5,306 of the 5,846 survivors have no sensory path, against 1 in the first random trial.
 
 **4** (attach `results/brain_vnc_curves.png`)
-Which cell types are critical depends on the circuit. Run separately, the brain loses half its routing after 5.9% of types by sensory-motor betweenness, the nerve cord only after 12.6%. Weighted in-degree does the reverse: 25.3% in the brain, 6.6% in the nerve cord. Under random removal the two are indistinguishable (p = 0.13).
+Which cell types are critical depends on the circuit. Run separately, the brain loses half its routing after 5.9% of types by sensory-motor betweenness, the nerve cord only after 12.6%. Weighted in-degree does the reverse: 25.3% in the brain, 6.6% in the nerve cord. Under random removal they do not differ significantly (Welch t = −1.54, p = 0.13).
 
 **5**
-A few more results. Removing all 480 descending neuron types costs 66.4% of routing, against 8.2% for random sets of the same size. Removing the strongest connections first halves it after 26.8% of connections, against 47.6% at random. And 14 neurons with published behavioral evidence rank high in sensory-motor betweenness (p = 0.045).
+A few more results. Removing all 480 descending neuron types costs 66.4% of routing, against 8.2% for random sets of the same size. Removing the strongest connections first halves it after 26.8% of connections, against 47.6% at random. And 14 cell types with published behavioral evidence rank high in sensory-motor betweenness (p = 0.045, or 0.10 with the motor neuron control).
 
 **6**
 Caveats: the literature result is modest and weakens to p = 0.10 with the motor neuron control included; cascade sizes are not robustly power-law (bootstrap p = 0.202 and 0.036); the degree-preserving null model is still running. This is a static wiring diagram at cell-type resolution. It says nothing about what a fly would do. Not peer reviewed.
@@ -33,7 +33,7 @@ Data: HHMI Janelia FlyEM and Google Research, Berg et al., Cell 2026, doi:10.101
 
 **Text:**
 
-HHMI Janelia FlyEM and Google Research published the connectome of an entire male *Drosophila* central nervous system, brain and ventral nerve cord together (Berg et al., Cell 2026). Because it contains both the sensory neurons that enter the CNS and the descending and motor neurons that leave it, you can ask a question the classic attack-tolerance studies could not: how much wiring can be lost before sensory input no longer reaches motor output?
+HHMI Janelia FlyEM and Google Research published the connectome of an entire male *Drosophila* central nervous system, brain and ventral nerve cord together (Berg et al., Cell 2026). Because it contains both the sensory neurons that enter the CNS and the descending and motor neurons that leave it, you can extend attack-tolerance analyses, including percolation on the FlyWire brain (Lin et al., Nature 2024), to routing from sensory input to motor output: how much wiring can be lost before sensory input no longer reaches motor output?
 
 I built a cell-type graph from neuPrint's `male-cns:v1.0` (11,751 types, 243,439 connections that each supply at least 1% of the target's input) and measured routing as maximum flow with unit capacities, which by Menger's theorem is the number of edge-disjoint paths from 368 sensory types to 665 descending and motor types. The intact graph has 10,647. Then I removed types in six orders, 1% of the remaining types per batch with every score recomputed, under a plan committed to the repository before the first run.
 
@@ -82,7 +82,7 @@ Hypotheses, tests and every protocol parameter were committed before any percola
 
 **Caveats I would flag first:**
 
-- The literature result depends on the pre-registered exclusion of the motor neuron control MN9. With it included, p = 0.10, and the 14 neurons are a small, non-random sample.
+- The literature result depends on the pre-registered exclusion of the motor neuron control MN9. With it included, p = 0.10, and the 14 cell types are a small, non-random sample.
 - Structural cascade sizes do not robustly follow a power law (bootstrap p = 0.202 in the primary set, 0.036 with all random runs pooled), and a lognormal fits as well.
 - The degree-preserving null model (200 randomized graphs, same protocol) is still running. I will post its result whether or not the real graph turns out more fragile.
 - Unit capacities ignore synapse counts, types of one neuron count the same as types of thousands, and removing a type from a graph is not silencing it in a fly.

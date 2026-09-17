@@ -143,6 +143,11 @@ def p_text(p: float) -> str:
     return f"{p:.2g}" if p < 0.1 else f"{p:.2f}"
 
 
+def u_text(u: float) -> str:
+    """Mann-Whitney U, which is a whole or half integer, without rounding away a half."""
+    return f"{u:.0f}" if float(u).is_integer() else f"{u:.1f}"
+
+
 def report_lines(report: dict) -> list[str]:
     """Lines of ``literature_validation.md``.
 
@@ -198,7 +203,8 @@ def report_lines(report: dict) -> list[str]:
            f"Its sensory-motor betweenness percentile is {control_row['sm_betweenness_percentile']:.1f}")
         + f", and removing it alone costs {flow_cost:.0f} path{'' if flow_cost == 1 else 's'} of flow capacity. It is "
         "therefore not a positive control for these scores, and the sensitivity result below reports what including "
-        "it does to the test.",
+        f"it does to the test. The pre-registration named `{control}` a positive control; that it cannot act as one "
+        "for this score was recognized only after scoring.",
         "",
         "## Test",
         "",
@@ -216,12 +222,12 @@ def report_lines(report: dict) -> list[str]:
     for name in set_labels:
         for score, label in SCORES.items():
             r = results[name][score]
-            lines.append(f"| {set_labels[name]} | {label} | {r['n_curated']} | {r['U']:.0f} | {r['p_value']:.2g} | "
+            lines.append(f"| {set_labels[name]} | {label} | {r['n_curated']} | {u_text(r['U'])} | {r['p_value']:.2g} | "
                          f"{r['auc']:.3f} | {r['median_percentile']:.1f} | {verdict(r)} |")
     lines += [
         "",
         f"Primary result: the curated types {'do' if primary['p_value'] < alpha else 'do not'} rank significantly higher "
-        f"in sensory-motor betweenness than other cell types (U = {primary['U']:.0f}, p = {p_text(primary['p_value'])}, "
+        f"in sensory-motor betweenness than other cell types (U = {u_text(primary['U'])}, p = {p_text(primary['p_value'])}, "
         f"AUC = {primary['auc']:.2f}, median percentile {primary['median_percentile']:.0f}).",
         "",
         f"Sensitivity to the positive control: without `{control}` the sensory-motor betweenness test gives "

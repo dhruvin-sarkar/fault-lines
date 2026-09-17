@@ -50,12 +50,81 @@ def remove_pair(pair: tuple[str, str]) -> tuple[str, str, int]:
     return pair[0], pair[1], flow_capacity(reduced, _WORKER["sources"], _WORKER["targets"])
 
 
+def report_lines(table: pd.DataFrame, summary: dict, n_types: int, superclass: dict[str, str]) -> list[str]:
+    """Lines of ``synthetic_lethal_pairs.md``.
+
+    Args:
+        table: all evaluated pairs sorted by synergy, as in ``synthetic_lethal_pairs.csv``.
+        summary: the contents of ``synthetic_lethal_pairs.json``.
+        n_types: number of cell types in the graph.
+        superclass: majority superclass per cell type.
+    Returns the markdown lines.
+    """
+    intact_flow = summary["intact_flow"]
+    expected = summary["pool_size"] * (summary["pool_size"] - 1) // 2
+    top = table.head(TOP_REPORTED)
+    return [
+        "# Synthetic-lethal cell-type pairs",
+        "",
+        "In genetics, two genes are synthetic lethal when losing either alone is tolerated but losing both is not. The "
+        "structural analogue here: two cell types whose joint removal cuts sensory-to-motor flow capacity by more than "
+        "the sum of what each removal does alone, most often because both are sensory types feeding the same "
+        "downstream capacity, so either can fill it when the other is gone.",
+        "",
+        "## Procedure",
+        "",
+        f"1. Single-removal impact I(v) = intact flow ({intact_flow} edge-disjoint S→M paths) minus flow with type v "
+        f"removed, for all {n_types} types.",
+        f"2. Candidate pool: the {summary['pool_size']} types with the largest I(v) per incident edge (in plus out edges "
+        "of the intact graph), a heuristic for types that carry a lot of flow for how connected they are; ties broken by "
+        f"higher sensory-motor betweenness. {summary['pool_types_with_nonzero_single_impact']} pool members have "
+        "I(v) > 0. Pool with scores: `results/synthetic_lethal_pool.csv`.",
+        f"3. Every pair in the pool, {len(table)} of {expected} (all), removed together: joint impact "
+        "I(u, v) = intact flow − flow without both; synergy = I(u, v) − I(u) − I(v).",
+        "",
+        f"{summary['pairs_with_positive_synergy']} pairs have positive synergy, "
+        f"{summary['pairs_with_negative_synergy']} negative (their individual impacts overlap), the rest zero. All "
+        "pairs: `results/synthetic_lethal_pairs.csv`.",
+        "",
+        f"## Top {TOP_REPORTED} pairs by synergy",
+        "",
+        "Every row can be checked from its own numbers: joint impact = intact flow − flow after; synergy = joint impact − "
+        "I(a) − I(b).",
+        "",
+        "| type a (superclass) | type b (superclass) | I(a) | I(b) | flow after removing both | joint impact | synergy |",
+        "|---|---|---|---|---|---|---|",
+        *[f"| `{r.type_a}` ({superclass[r.type_a]}) | `{r.type_b}` ({superclass[r.type_b]}) | {r.impact_a} | {r.impact_b} | "
+          f"{r.flow_after} | {r.joint_impact} | {r.synergy:+d} |" for r in top.itertuples()],
+        "",
+        "Flow capacity counts edge-disjoint paths, so a positive synergy means the two types substitute for each other "
+        "at the sensory entry points into shared downstream capacity; this does not show parallel pathways deeper in "
+        "the circuit. It is a structural statement about the wiring diagram, not a prediction of what silencing both "
+        "types would do to a fly.",
+        "",
+    ]
+
+
+def write_report(table: pd.DataFrame, summary: dict, graph: ig.Graph) -> None:
+    """Write ``synthetic_lethal_pairs.md`` and print its table section."""
+    superclass = dict(zip(graph.vs["name"], graph.vs["superclass"]))
+    lines = report_lines(table, summary, graph.vcount(), superclass)
+    (RESULTS / "synthetic_lethal_pairs.md").write_text("\n".join(lines), encoding="utf-8")
+    print("\n".join(lines[-TOP_REPORTED - 6:]))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--from-results", action="store_true",
+                        help="rebuild the report from results/synthetic_lethal_pairs.csv and .json instead of "
+                             "recomputing")
     args = parser.parse_args()
 
     graph = load_type_graph()
+    if args.from_results:
+        summary = json.loads((RESULTS / "synthetic_lethal_pairs.json").read_text(encoding="utf-8"))
+        write_report(pd.read_csv(RESULTS / "synthetic_lethal_pairs.csv"), summary, graph)
+        return
     sources, targets = load_sensory_motor_sets()
     single = load_single_removal()
     intact_flow = int(single["intact_flow"].iloc[0])
@@ -82,7 +151,6 @@ def main() -> None:
     table.to_csv(RESULTS / "synthetic_lethal_pairs.csv", index=False)
     pool.to_csv(RESULTS / "synthetic_lethal_pool.csv", index=False, float_format="%.6g")
 
-    superclass = dict(zip(graph.vs["name"], graph.vs["superclass"]))
     positive = table[table["synergy"] > 0]
     top = table.head(TOP_REPORTED)
     summary = {
@@ -92,45 +160,7 @@ def main() -> None:
         "max_synergy": int(table["synergy"].max()), "top_pairs": top.to_dict("records"),
     }
     (RESULTS / "synthetic_lethal_pairs.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
-
-    lines = [
-        "# Synthetic-lethal cell-type pairs",
-        "",
-        "In genetics, two genes are synthetic lethal when losing either alone is tolerated but losing both is not. The "
-        "structural analogue here: two cell types whose joint removal cuts sensory-to-motor flow capacity by more than "
-        "the sum of what each removal does alone, because each provides the other's detour.",
-        "",
-        "## Procedure",
-        "",
-        f"1. Single-removal impact I(v) = intact flow ({intact_flow} edge-disjoint S→M paths) minus flow with type v "
-        f"removed, for all {graph.vcount()} types.",
-        f"2. Candidate pool: the {POOL_SIZE} types with the largest I(v) per incident edge (in plus out edges of the "
-        "intact graph), a heuristic for types that carry a lot of flow for how connected they are; ties broken by higher "
-        f"sensory-motor betweenness. {summary['pool_types_with_nonzero_single_impact']} pool members have I(v) > 0. "
-        "Pool with scores: `results/synthetic_lethal_pool.csv`.",
-        f"3. Every pair in the pool, {len(table)} of {expected} (all), removed together: joint impact "
-        "I(u, v) = intact flow − flow without both; synergy = I(u, v) − I(u) − I(v).",
-        "",
-        f"{len(positive)} pairs have positive synergy, {summary['pairs_with_negative_synergy']} negative (their "
-        "individual impacts overlap), the rest zero. All pairs: `results/synthetic_lethal_pairs.csv`.",
-        "",
-        f"## Top {TOP_REPORTED} pairs by synergy",
-        "",
-        "Every row can be checked from its own numbers: joint impact = intact flow − flow after; synergy = joint impact − "
-        "I(a) − I(b).",
-        "",
-        "| type a (superclass) | type b (superclass) | I(a) | I(b) | flow after removing both | joint impact | synergy |",
-        "|---|---|---|---|---|---|---|",
-        *[f"| `{r.type_a}` ({superclass[r.type_a]}) | `{r.type_b}` ({superclass[r.type_b]}) | {r.impact_a} | {r.impact_b} | "
-          f"{r.flow_after} | {r.joint_impact} | {r.synergy:+d} |" for r in top.itertuples()],
-        "",
-        "Flow capacity counts edge-disjoint paths, so a positive synergy means the two types sit on alternative routes "
-        "that can substitute for each other. It is a structural statement about the wiring diagram, not a prediction "
-        "of what silencing both types would do to a fly.",
-        "",
-    ]
-    (RESULTS / "synthetic_lethal_pairs.md").write_text("\n".join(lines), encoding="utf-8")
-    print("\n".join(lines[-TOP_REPORTED - 6:]))
+    write_report(table, summary, graph)
 
 
 if __name__ == "__main__":

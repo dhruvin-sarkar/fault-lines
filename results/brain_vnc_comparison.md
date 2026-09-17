@@ -2,9 +2,9 @@
 
 ## Classification rule
 
-For every cell type, the synapses of all its neurons (presynaptic plus postsynaptic sites) are counted in two compartments of the neuPrint ROI hierarchy: the brain (`CentralBrain`, `Optic(L)`, `Optic(R)`) and the ventral nerve cord (`VNC`). A type is **brain-dominant** if more than half of those synapses are in the brain and **VNC-dominant** if more than half are in the VNC. Synapses in the neck connective (`CV`) are not counted. 0 types with no synapses in either compartment, or exactly half in each, are left out. Per-type counts: `results/type_compartments.csv`.
+For every cell type, the synapses of all its neurons (presynaptic plus postsynaptic sites) are counted in two compartments of the neuPrint ROI hierarchy: the brain (`CentralBrain`, `Optic(L)`, `Optic(R)`) and the ventral nerve cord (`VNC`). A type is **brain-dominant** if more than half of those synapses are in the brain and **VNC-dominant** if more than half are in the VNC. Synapses in the neck connective (`CV`) are not counted. No type lacks synapses in both compartments or has exactly half in each, so no types are left out. Per-type counts: `results/type_compartments.csv`.
 
-Brain-dominant: 8123 types. VNC-dominant: 3628 types. Each subgraph is the induced subgraph of the whole-CNS type graph (edges keep the whole-CNS 1% input threshold), with its own sensory set S and descending/motor set M: the members of S and M whose types fall in that compartment. Descending and motor types by compartment: brain: 498, vnc: 167.
+Brain-dominant: 8123 types. VNC-dominant: 3628 types. Each subgraph is the induced subgraph of the whole-CNS type graph (edges keep the whole-CNS 1% input threshold), with its own sensory set S and descending/motor set M: the members of S and M whose types fall in that compartment. Descending and motor types by compartment: brain 498, nerve cord 167.
 
 | | brain-dominant | VNC-dominant |
 |---|---|---|

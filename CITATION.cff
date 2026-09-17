@@ -4,7 +4,7 @@ title: "Fault Lines: attack tolerance and structural robustness of the complete 
 authors:
   - family-names: Sarkar
     given-names: Dhruvin
-date-released: 2026-09-15
+date-released: 2026-09-17
 license: MIT
 repository-code: "https://github.com/dhruvin-sarkar/fault-lines"
 references:

@@ -5,6 +5,7 @@ import json
 import math
 import re
 from collections.abc import Callable, Iterable, Sequence
+from decimal import ROUND_HALF_UP, Decimal
 from html import escape
 from pathlib import Path
 
@@ -114,8 +115,12 @@ def linear(d0: float, d1: float, r0: float, r1: float) -> Callable[[float], floa
 
 
 def pct(value: float, digits: int = 1) -> str:
-    """Format a fraction as a percentage, e.g. 0.0411 -> '4.1%'."""
-    return f"{value * 100:.{digits}f}%"
+    """Format a fraction as a percentage, e.g. 0.0411 -> '4.1%'.
+
+    Rounds half up from the shortest decimal form of ``value``, so a stored 0.2055 gives '20.6%' as the tables do.
+    """
+    scaled = Decimal(str(float(value))) * 100
+    return f"{scaled.quantize(Decimal(1).scaleb(-digits), rounding=ROUND_HALF_UP)}%"
 
 
 def count(value: float) -> str:
@@ -582,7 +587,7 @@ def stat_plate(data: dict, theme: str) -> tuple[str, str, str]:
         f"Results at a glance. Removing cell types in order of output synapses halves sensory-to-motor flow capacity "
         f"after {pct(h['fc_top'])} of {count(h['types'])} types; random removal needs {pct(h['fc_random'])} "
         f"(95% CI {pct(lo)} to {pct(hi)}). At each strategy's half-flow point at most {h['silenced_at_half_max']} types "
-        f"have lost every path from sensory input; at {pct(h['fraction_end'])} removed, "
+        f"have lost every path from sensory input; at {pct(h['fraction_end'], 2)} removed, "
         f"{count(ends['sm_betweenness'])} of {count(h['survivors_end'])} surviving types are cut off under "
         f"sensory-motor betweenness against {count(ends['random'])} at random. Removing the connections with the most "
         f"synapses first halves routing after {pct(h['edge_strongest'])} of connections, against "
@@ -885,8 +890,9 @@ def figure_compartments(data: dict, theme: str) -> tuple[str, str, str]:
         svg.text(xa - 42, ly + 9, f"{STRATEGY_NAMES[strategy]}  {a:.3f}", 26, "ink", anchor="end")
         svg.text(xb + 42, ry + 9, f"{b:.3f}  {STRATEGY_NAMES[strategy]}", 26, "ink")
     welch = comp["welch_random_trials"]["auc_flow"]
-    note = (f"Random removal does not separate the two (Welch t = {welch['t']:.2f}, p = {welch['p_value']:.2f}). "
-            f"The most damaging order does: sensory-motor betweenness in the brain, weighted in-degree in the nerve cord.")
+    note = (f"Under random removal the two do not differ significantly (Welch t = {welch['t']:.2f}, "
+            f"p = {welch['p_value']:.2f}). The most damaging order differs: sensory-motor betweenness in the brain, "
+            f"weighted in-degree in the nerve cord.")
     note_lines = wrap(note, 26, WIDTH - 2 * MARGIN)
     for k, line in enumerate(note_lines):
         svg.text(MARGIN, 910 - (len(note_lines) - 1 - k) * 36, line, 26, "ink2")
@@ -897,8 +903,8 @@ def figure_compartments(data: dict, theme: str) -> tuple[str, str, str]:
     desc = (
         f"Figure 5. Slope chart of flow-capacity AUC for each removal order in the brain-dominant subgraph "
         f"({count(brain['types'])} types) and the nerve cord-dominant subgraph ({count(vnc['types'])} types); lower is "
-        f"more fragile. Brain: {listing(brain)}. Nerve cord: {listing(vnc)}. Random removal is indistinguishable "
-        f"between them (Welch t = {welch['t']:.2f}, p = {welch['p_value']:.2f}), but the most damaging order changes."
+        f"more fragile. Brain: {listing(brain)}. Nerve cord: {listing(vnc)}. Under random removal they do not differ "
+        f"significantly (Welch t = {welch['t']:.2f}, p = {welch['p_value']:.2f}), but the most damaging order changes."
     )
     return svg.render("Figure 5. Brain and nerve cord", desc), desc, f"fig-compartments-{theme}.svg"
 

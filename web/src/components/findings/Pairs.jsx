@@ -99,7 +99,7 @@ function PairsView({ data, types, atlas }) {
         <p>
           In genetics, two genes are synthetic lethal when losing either one is tolerated and losing both is not. The
           structural analogue is a pair of cell types whose joint removal cuts sensory-to-motor flow capacity by more
-          than the two single removals added together, because each carries the detour the other would need.
+          than the two single removals added together, because one can take over capacity the other leaves unused.
         </p>
         <p>
           Every pair among {count(data.pool_size)} candidate types was removed together, {count(data.pairs_evaluated)}{" "}
@@ -121,7 +121,8 @@ function PairsView({ data, types, atlas }) {
           {poolSensory == null &&
             `${sensoryPairs === pairs.length ? `All ${count(pairs.length)}` : `${count(sensoryPairs)} of the ${count(pairs.length)}`} strongest pairs join two sensory types. `}
           Sensory types are where flow enters. When two of them feed the same downstream connections, either can fill
-          capacity the other leaves unused, so removing one costs little and removing both costs more. Positive synergy
+          capacity the other leaves unused, so each removal alone is partly absorbed by the other and removing both
+          costs more. Positive synergy
           between sensory types is largely a property of how the flow metric treats its sources. Ranking candidates by
           flow lost per connection filled the pool with sensory types, so it never reached the interneuron pairs it was
           meant to probe.

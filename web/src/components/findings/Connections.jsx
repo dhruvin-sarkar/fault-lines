@@ -96,9 +96,9 @@ function ConnectionsView({ data, percolation }) {
         )}
         <p>
           Flow capacity counts each connection once, whatever its synapse count. A heavy connection running alongside
-          others can go without costing a route, while a light connection that is the only way across cannot. In this
-          measure, routing depends more on the cell types where many connections meet than on the heaviest single
-          connections.
+          others can go without costing a route, while a light connection that is the only way across cannot.
+          {typeTarget != null &&
+            ` Flow halves after ${percent(typeTarget)} of cell types are removed by ${strategyLabel("out_strength")}, and after ${percent(strongest)} of connections are removed strongest first. The two fractions count different units, so they do not rank cell types against connections.`}
         </p>
       </TextBlock>
 

@@ -167,8 +167,9 @@ function LiteratureView({ data }) {
             {controlInfo && (
               <Sidenote title="Positive control">
                 <span className="id">{CONTROL}</span> drives {controlInfo.behavior}.
-                As a motor type it ends sensory-to-motor routes, so removing it costs flow almost by construction. It is
-                drawn as an open ring and left out of the test
+                As a motor type it ends sensory-to-motor routes rather than relaying them, so it scores zero on
+                sensory-motor betweenness and removing it alone costs a single route. It is drawn as an open ring and
+                left out of the test, as pre-registered
                 {control ? `; including it gives AUC ${fixed(control.auc, 2)}, p = ${pValue(control.p_value)}` : ""}.
               </Sidenote>
             )}

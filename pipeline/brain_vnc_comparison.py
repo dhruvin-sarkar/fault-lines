@@ -81,63 +81,24 @@ def plot(results: dict) -> None:
     plt.close(fig)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--workers", type=int, default=4)
-    parser.add_argument("--from-results", action="store_true",
-                        help="redraw the figure from results/brain_vnc_comparison.json and the cached runs without "
-                             "rerunning percolation")
-    args = parser.parse_args()
+COMPARTMENT_NAMES = {"brain": "brain", "vnc": "nerve cord"}
 
-    if args.from_results:
-        summary = json.loads((RESULTS / "brain_vnc_comparison.json").read_text(encoding="utf-8"))
-        plot({c: {**summary["compartments"][c], "runs": load_all_runs(RUNS_ROOT / c)} for c in COMPARTMENTS})
-        return
 
-    graph = load_type_graph()
-    sources, targets = load_sensory_motor_sets()
-    classes = classify_types(pd.read_parquet(NEURON_ROI_PATH), pd.read_parquet(NEURONS_PATH))
-    classes.to_csv(RESULTS / "type_compartments.csv", index=False, float_format="%.4f")
+def report_lines(summary: dict) -> list[str]:
+    """Lines of ``brain_vnc_comparison.md``.
 
-    results = {}
-    for compartment in COMPARTMENTS:
-        members = set(classes.loc[classes["compartment"] == compartment, "cell_type"])
-        sub = graph.induced_subgraph([v.index for v in graph.vs if v["name"] in members])
-        sub_sources = [s for s in sources if s in members]
-        sub_targets = [t for t in targets if t in members]
-        intact_flow = flow_capacity(sub, sub_sources, sub_targets)
-        intact_pairs = reachable_pairs(sub, sub_sources, sub_targets)
-        runs = run_protocol(sub, sub_sources, sub_targets, RUNS_ROOT / compartment, args.workers)
-        scores = score_runs(runs, intact_flow, intact_pairs)
-        f_c = {s: critical_fraction(runs[(s, 0)]["fraction_removed"], runs[(s, 0)]["flow"])[0] for s in TARGETED}
-        f_c["random"] = mean_ci95([critical_fraction(runs[("random", t)]["fraction_removed"], runs[("random", t)]["flow"])[0]
-                                   for t in range(RANDOM_TRIALS)])[0]
-        results[compartment] = {
-            "types": sub.vcount(), "edges": sub.ecount(), "sensory": len(sub_sources), "motor": len(sub_targets),
-            "intact_flow": intact_flow, "intact_pairs": intact_pairs, "scores": scores, "f_c": f_c, "runs": runs,
-        }
-
-    welch = {}
-    for key in ("auc_flow", "auc_reachability"):
-        t, p = stats.ttest_ind(results["brain"]["scores"]["random"][f"{key}_trials"],
-                               results["vnc"]["scores"]["random"][f"{key}_trials"], equal_var=False)
-        welch[key] = {"t": float(t), "p_value": float(p)}
-    plot(results)
-
-    unclassified = classes["compartment"].isna()
-    counts = classes["compartment"].value_counts()
-    motor_split = classes[classes["cell_type"].isin(targets)]["compartment"].value_counts(dropna=False)
-    summary = {
-        "rule": "brain-dominant if more than half of the type's synapses (pre + post, summed over its neurons) in "
-                "CentralBrain, Optic(L), Optic(R) or VNC lie in the first three; VNC-dominant if less than half",
-        "unclassified_types": int(unclassified.sum()),
-        "compartments": {c: {k: v for k, v in r.items() if k != "runs"} for c, r in results.items()},
-        "welch_random_trials": welch,
-        "descending_motor_types_by_compartment": {str(k): int(v) for k, v in motor_split.items()},
-    }
-    (RESULTS / "brain_vnc_comparison.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
-
-    b, v = results["brain"], results["vnc"]
+    Parameters: ``summary``, the contents of ``brain_vnc_comparison.json``.
+    Returns the markdown lines.
+    """
+    b, v = summary["compartments"]["brain"], summary["compartments"]["vnc"]
+    welch = summary["welch_random_trials"]
+    unclassified = summary["unclassified_types"]
+    motor_split = summary["descending_motor_types_by_compartment"]
+    left_out = (
+        f"{unclassified} types with no synapses in either compartment, or exactly half in each, are left out."
+        if unclassified else
+        "No type lacks synapses in both compartments or has exactly half in each, so no types are left out."
+    )
     lines = [
         "# Brain versus ventral nerve cord",
         "",
@@ -147,14 +108,13 @@ def main() -> None:
         "compartments of the neuPrint ROI hierarchy: the brain (`CentralBrain`, `Optic(L)`, `Optic(R)`) and the "
         "ventral nerve cord (`VNC`). A type is **brain-dominant** if more than half of those synapses are in the "
         "brain and **VNC-dominant** if more than half are in the VNC. Synapses in the neck connective (`CV`) are not "
-        f"counted. {int(unclassified.sum())} types with no synapses in either compartment, or exactly half in each, "
-        "are left out. Per-type counts: `results/type_compartments.csv`.",
+        f"counted. {left_out} Per-type counts: `results/type_compartments.csv`.",
         "",
-        f"Brain-dominant: {int(counts.get('brain', 0))} types. VNC-dominant: {int(counts.get('vnc', 0))} types. "
+        f"Brain-dominant: {b['types']} types. VNC-dominant: {v['types']} types. "
         "Each subgraph is the induced subgraph of the whole-CNS type graph (edges keep the whole-CNS 1% input "
         "threshold), with its own sensory set S and descending/motor set M: the members of S and M whose types fall in "
         "that compartment. Descending and motor types by compartment: "
-        + ", ".join(f"{k}: {int(n)}" for k, n in motor_split.items()) + ".",
+        + ", ".join(f"{COMPARTMENT_NAMES.get(k, 'unclassified')} {int(n)}" for k, n in motor_split.items()) + ".",
         "",
         "| | brain-dominant | VNC-dominant |",
         "|---|---|---|",
@@ -196,8 +156,73 @@ def main() -> None:
         "![Brain and VNC percolation curves](brain_vnc_curves.png)",
         "",
     ]
+    return lines
+
+
+def write_report(summary: dict) -> None:
+    """Write ``brain_vnc_comparison.md`` from the saved summary and print it."""
+    lines = report_lines(summary)
     (RESULTS / "brain_vnc_comparison.md").write_text("\n".join(lines), encoding="utf-8")
     print("\n".join(lines))
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--from-results", action="store_true",
+                        help="redraw the figure and report from results/brain_vnc_comparison.json and the cached "
+                             "runs without rerunning percolation")
+    args = parser.parse_args()
+
+    if args.from_results:
+        summary = json.loads((RESULTS / "brain_vnc_comparison.json").read_text(encoding="utf-8"))
+        plot({c: {**summary["compartments"][c], "runs": load_all_runs(RUNS_ROOT / c)} for c in COMPARTMENTS})
+        write_report(summary)
+        return
+
+    graph = load_type_graph()
+    sources, targets = load_sensory_motor_sets()
+    classes = classify_types(pd.read_parquet(NEURON_ROI_PATH), pd.read_parquet(NEURONS_PATH))
+    classes.to_csv(RESULTS / "type_compartments.csv", index=False, float_format="%.4f")
+
+    results = {}
+    for compartment in COMPARTMENTS:
+        members = set(classes.loc[classes["compartment"] == compartment, "cell_type"])
+        sub = graph.induced_subgraph([v.index for v in graph.vs if v["name"] in members])
+        sub_sources = [s for s in sources if s in members]
+        sub_targets = [t for t in targets if t in members]
+        intact_flow = flow_capacity(sub, sub_sources, sub_targets)
+        intact_pairs = reachable_pairs(sub, sub_sources, sub_targets)
+        runs = run_protocol(sub, sub_sources, sub_targets, RUNS_ROOT / compartment, args.workers)
+        scores = score_runs(runs, intact_flow, intact_pairs)
+        f_c = {s: critical_fraction(runs[(s, 0)]["fraction_removed"], runs[(s, 0)]["flow"])[0] for s in TARGETED}
+        f_c["random"] = mean_ci95([critical_fraction(runs[("random", t)]["fraction_removed"], runs[("random", t)]["flow"])[0]
+                                   for t in range(RANDOM_TRIALS)])[0]
+        results[compartment] = {
+            "types": sub.vcount(), "edges": sub.ecount(), "sensory": len(sub_sources), "motor": len(sub_targets),
+            "intact_flow": intact_flow, "intact_pairs": intact_pairs, "scores": scores, "f_c": f_c, "runs": runs,
+        }
+
+    welch = {}
+    for key in ("auc_flow", "auc_reachability"):
+        t, p = stats.ttest_ind(results["brain"]["scores"]["random"][f"{key}_trials"],
+                               results["vnc"]["scores"]["random"][f"{key}_trials"], equal_var=False)
+        welch[key] = {"t": float(t), "p_value": float(p)}
+    plot(results)
+
+    unclassified = classes["compartment"].isna()
+    motor_split = classes[classes["cell_type"].isin(targets)]["compartment"].value_counts(dropna=False)
+    summary = {
+        "rule": "brain-dominant if more than half of the type's synapses (pre + post, summed over its neurons) in "
+                "CentralBrain, Optic(L), Optic(R) or VNC lie in the first three; VNC-dominant if less than half",
+        "unclassified_types": int(unclassified.sum()),
+        "compartments": {c: {k: v for k, v in r.items() if k != "runs"} for c, r in results.items()},
+        "welch_random_trials": welch,
+        "descending_motor_types_by_compartment": {str(k): int(v) for k, v in motor_split.items()},
+    }
+    (RESULTS / "brain_vnc_comparison.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+
+    write_report(summary)
 
 
 if __name__ == "__main__":
