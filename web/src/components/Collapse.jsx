@@ -1,7 +1,7 @@
-import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import Atlas, { atlasAspect } from "./Atlas.jsx";
-import { ChartFrame, Row, Tooltip, XAxis, YAxis, spreadLabels } from "./Chart.jsx";
-import { Figure, Segmented, Sidenote, Slider, TextBlock } from "./ui.jsx";
+import { ChartFrame, XAxis, YAxis, spreadLabels } from "./Chart.jsx";
+import { Figure, Segmented, Sidenote, TextBlock } from "./ui.jsx";
 import { useInView, useReducedMotion, useTokens, useWidth } from "../lib/hooks.js";
 import { count, fixed, numberWord, percent, sentence, valueAt } from "../lib/format.js";
 import { band, line, linear } from "../lib/scales.js";
@@ -9,7 +9,7 @@ import "../styles/collapse.css";
 
 const STEP_MS = 120;
 const CALM_STEP_MS = 600;
-const ROW = 64;
+const THUMB = 14;
 const MAP_TOKENS = ["field-ink-2"];
 
 const METRICS = {
@@ -31,8 +31,11 @@ const METRICS = {
   },
 };
 
-const WIDE_MARGIN = { top: 32, right: 176, bottom: 46, left: 54 };
-const NARROW_MARGIN = { top: 32, right: 12, bottom: 42, left: 40 };
+// The right margin holds the labels at the playhead: a value column, then the strategy name.
+const WIDE_MARGIN = { top: 32, right: 228, bottom: 46, left: 54 };
+const NARROW_MARGIN = { top: 32, right: 14, bottom: 42, left: 40 };
+const LABEL_VALUE_X = 50;
+const LABEL_NAME_X = 58;
 
 /** Removal fraction where a normalized series first drops below one half, interpolated; null if it never does. */
 function halfCrossing(fractions, values) {
@@ -96,9 +99,17 @@ function Icon({ kind }) {
   }
   return (
     <svg viewBox="0 0 14 14" aria-hidden="true">
-      <path d="M3.5 1.8 12 7l-8.5 5.2z" fill="currentColor" />
+      <path d="M4 1.8 12.2 7 4 12.2z" fill="currentColor" />
     </svg>
   );
+}
+
+function nearestStep(fractions, f) {
+  let best = 0;
+  for (let i = 1; i < fractions.length; i += 1) {
+    if (Math.abs(fractions[i] - f) < Math.abs(fractions[best] - f)) best = i;
+  }
+  return best;
 }
 
 export default function Collapse({ meta, percolation, types, atlas }) {
@@ -106,7 +117,7 @@ export default function Collapse({ meta, percolation, types, atlas }) {
   const strategies = meta.strategies;
   const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const clipId = `race-clip-${uid}`;
-  const focusLabelId = `race-focus-${uid}`;
+  const measureLabelId = `race-measure-${uid}`;
 
   const model = useMemo(() => {
     const fractions = percolation.strategies[strategies[0].id].fraction_removed;
@@ -143,29 +154,23 @@ export default function Collapse({ meta, percolation, types, atlas }) {
     for (let k = 0; k * 0.1 <= fractions[last] + 1e-9; k += 1) ticks.push(Number((k * 0.1).toFixed(2)));
     return ticks;
   }, [fractions, last]);
-  const tenPercent = useMemo(() => {
-    let best = 0;
-    fractions.forEach((f, i) => {
-      if (Math.abs(f - 0.1) < Math.abs(fractions[best] - 0.1)) best = i;
-    });
-    return best;
-  }, [fractions]);
+  const tenPercent = useMemo(() => nearestStep(fractions, 0.1), [fractions]);
 
   const stepMs = reduced ? CALM_STEP_MS : STEP_MS;
   const { batch, setBatch, playing, setPlaying } = useRace(last, reduced ? tenPercent : 0, stepMs);
   const [metric, setMetric] = useState("flow");
-  const [focus, setFocus] = useState("all");
-  const [hover, setHover] = useState(null);
+  const [pinned, setPinned] = useState(null);
+  const [hovered, setHovered] = useState(null);
+  const [hoverStep, setHoverStep] = useState(null);
   const [mainRef, mainWidth] = useWidth(900);
   const [viewRef, seen] = useInView("0px 0px -35% 0px");
   const started = useRef(false);
   const pressed = useRef(false);
-  const rows = useRef(new Map());
-  const previousRank = useRef(new Map());
+  const labelSpots = useRef([]);
   const mapTokens = useTokens(MAP_TOKENS);
 
   const narrow = mainWidth < 640;
-  const height = narrow ? 300 : 420;
+  const height = narrow ? 300 : 440;
   const margin = narrow ? NARROW_MARGIN : WIDE_MARGIN;
   const series = model[metric];
   const m = METRICS[metric];
@@ -173,7 +178,8 @@ export default function Collapse({ meta, percolation, types, atlas }) {
   const random = series.find((s) => s.trials);
   const total = strategies.length;
   const totalWord = numberWord(total);
-  const dim = (id) => focus !== "all" && focus !== id;
+  const active = hovered ?? pinned;
+  const dim = (id) => active != null && active !== id;
 
   useEffect(() => {
     if (!seen || reduced || started.current) return;
@@ -182,30 +188,15 @@ export default function Collapse({ meta, percolation, types, atlas }) {
     setPlaying(true);
   }, [seen, reduced, setBatch, setPlaying]);
 
-  const standings = series
-    .map((s) => ({ ...s, value: s.values[batch], halved: s.halvedAt != null && fraction >= s.halvedAt - 1e-9 }))
-    .sort((a, b) => a.value - b.value || a.auc - b.auc);
-
-  useLayoutEffect(() => {
-    standings.forEach((s, rank) => {
-      const node = rows.current.get(s.id);
-      if (!node) return;
-      const from = previousRank.current.get(s.id);
-      if (from != null && from !== rank) {
-        node.style.transition = "none";
-        node.style.transform = `translateY(${from * ROW}px)`;
-        node.getBoundingClientRect();
-        node.style.transition = "";
-      }
-      node.style.transform = `translateY(${rank * ROW}px)`;
-      previousRank.current.set(s.id, rank);
-    });
-  });
+  const halved = (s) => s.halvedAt != null && fraction >= s.halvedAt - 1e-9;
+  const halvedCount = series.filter(halved).length;
+  const removedCount = atlas.replay[strategies[0].id].removed_types[batch];
 
   const [announcement, setAnnouncement] = useState("");
-  const summary = `At ${percent(fraction)} of cell types removed, ${m.noun} remaining: ${standings
-    .map((s) => `${s.label} ${percent(s.value)}`)
-    .join(", ")}.`;
+  const ranked = [...series].sort((a, b) => a.values[batch] - b.values[batch] || a.auc - b.auc);
+  const summary = `At ${percent(fraction)} of cell types removed, ${m.noun} remaining: ${ranked
+    .map((s) => `${s.label} ${percent(s.values[batch])}`)
+    .join(", ")}. ${halvedSentence(halvedCount, total, m.noun)}`;
   useEffect(() => {
     if (playing || !started.current) return undefined;
     const timer = setTimeout(() => setAnnouncement(summary), 700);
@@ -227,22 +218,7 @@ export default function Collapse({ meta, percolation, types, atlas }) {
     }
   }
 
-  function nearestIndex(x, inner) {
-    const f = (Math.max(0, Math.min(inner.width, x)) / inner.width) * fractions[last];
-    let best = 0;
-    for (let i = 1; i < fractions.length; i += 1) {
-      if (Math.abs(fractions[i] - f) < Math.abs(fractions[best] - f)) best = i;
-    }
-    return best;
-  }
-
-  function pointer(x, y, inner) {
-    const index = nearestIndex(x, inner);
-    if (index !== hover?.index || (x > inner.width / 2 ? "left" : "right") !== hover?.side) {
-      setHover({ index, side: x > inner.width / 2 ? "left" : "right" });
-    }
-    if (pressed.current && index !== batch) seek(index);
-  }
+  const togglePin = useCallback((id) => setPinned((current) => (current === id ? null : id)), []);
 
   const paths = useRef({ key: "", value: null });
   function geometry(inner) {
@@ -265,43 +241,69 @@ export default function Collapse({ meta, percolation, types, atlas }) {
     return value;
   }
 
+  /** Highlights the line nearest the pointer, or the label under it; a pressed mouse drags the step. */
+  function pointer(px, py, inner) {
+    const { x, y } = geometry(inner);
+    let target = null;
+    let step = null;
+    if (px > inner.width + 4) {
+      const spot = labelSpots.current.find((l) => Math.abs(l.y - py) <= 8);
+      target = spot?.id ?? null;
+    } else {
+      step = nearestStep(fractions, x.invert(Math.max(0, Math.min(inner.width, px))));
+      if (step <= batch) {
+        let best = 18;
+        for (const s of series) {
+          const d = Math.abs(y(s.values[step]) - py);
+          if (d < best) {
+            best = d;
+            target = s.id;
+          }
+        }
+      }
+    }
+    if (target !== hovered) setHovered(target);
+    if (step !== hoverStep) setHoverStep(step);
+    if (pressed.current && step != null && step !== batch) seek(step);
+  }
+
   const atEnd = batch >= last;
   const playLabel = playing ? "Pause" : atEnd ? "Replay" : batch > 0 && started.current ? "Resume" : "Play";
-  const halvedCount = standings.filter((s) => s.halved).length;
-  const leader = standings[0];
-  const randomNow = random && standings.find((s) => s.id === random.id);
   const aspect = useMemo(() => atlasAspect(types, atlas), [types, atlas]);
-  const randomTrials = random && percolation.strategies[random.id].trials;
-  const avalanche = useMemo(() => {
-    let best = null;
-    for (const { id, label } of strategies) {
-      const sizes = percolation.strategies[id].avalanche;
-      if (!Array.isArray(sizes)) continue;
-      sizes.forEach((size, i) => {
-        if (!best || size > best.size) best = { size, label, fraction: fractions[i] };
-      });
-    }
-    return best;
-  }, [percolation, strategies, fractions]);
+  const firstToHalve = series
+    .filter((s) => !s.trials && s.halvedAt != null)
+    .sort((a, b) => a.halvedAt - b.halvedAt)[0];
+  const annotated = (active ? [active, random?.id] : [firstToHalve?.id, random?.id]).filter(
+    (id, i, list) => id && list.indexOf(id) === i,
+  );
 
   const motion = {
     "--race-step": playing ? `${stepMs}ms` : "260ms",
     "--race-ease": playing ? "linear" : "var(--ease)",
+    "--race-left": `${margin.left}px`,
+    "--race-right": `${margin.right}px`,
+    "--race-thumb": `${THUMB}px`,
   };
 
-  const controls = (
-    <div className="race-controls">
-      <button type="button" className="btn is-strong race-play" onClick={toggle} aria-label={`${playLabel} the removal race`}>
-        <Icon kind={playing ? "pause" : atEnd ? "replay" : "play"} />
-        {playLabel}
-      </button>
+  const measure = (
+    <div className="race-measure">
+      <span className="race-measure-label" id={measureLabelId}>
+        Measure
+      </span>
       <Segmented
-        label="Measure shown"
+        labelledBy={measureLabelId}
         options={Object.entries(METRICS).map(([value, item]) => ({ value, label: item.label }))}
         value={metric}
         onChange={setMetric}
       />
     </div>
+  );
+
+  const readout = (
+    <p className="race-readout" aria-hidden="true">
+      <span className="number">{percent(fraction)}</span>
+      <span className="race-readout-note">removed, {count(removedCount)} cell types</span>
+    </p>
   );
 
   return (
@@ -313,73 +315,44 @@ export default function Collapse({ meta, percolation, types, atlas }) {
           id="collapse-race"
           title={`The race between ${totalWord} attacks`}
           variant="field"
-          controls={controls}
+          controls={measure}
           caption={
             <>
-              Each map is the nervous system at the current step under one strategy, one square per cell type at its
-              place in the brain and nerve cord. Types removed in earlier steps are no longer drawn, and gray squares are
-              types still present but cut off from every sensory type.
-              {avalanche && avalanche.size > 1000
-                ? ` The largest single step, under ${avalanche.label} at ${percent(avalanche.fraction)} removed, cuts ${count(avalanche.size)} cell types off from sensory input at once.`
-                : ""}
+              Each line is the share of {m.noun} left as cell types are removed, and each map shows the same step under
+              one attack. Red dots mark where an attack halves it; point at a line or map, or select a map&apos;s name,
+              to follow one attack.
             </>
           }
         >
-          <div className="race-focus">
-            <span className="label" id={focusLabelId}>
-              Follow a strategy
-            </span>
-            <Segmented
-              label="Follow a strategy"
-              options={[
-                { value: "all", label: `All ${totalWord}` },
-                ...strategies.map(({ id, label }) => ({ value: id, label: sentence(label), color: `var(--glow-${id})` })),
-              ]}
-              value={focus}
-              onChange={setFocus}
-            />
-          </div>
-
-          <div className="instrument race-instrument" ref={viewRef} style={motion}>
-            <div className="instrument-main" ref={mainRef}>
+          <div
+            className={`race ${active ? "has-focus" : ""}`}
+            ref={viewRef}
+            style={motion}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && pinned) setPinned(null);
+            }}
+          >
+            <div className="race-main" ref={mainRef}>
               <div
-                className={`race-chart race-tip-${narrow ? "top" : hover?.side ?? "right"}`}
+                className="race-chart"
                 onPointerDown={(event) => {
                   if (event.pointerType === "mouse") pressed.current = true;
                 }}
                 onPointerUp={() => (pressed.current = false)}
                 onPointerLeave={() => (pressed.current = false)}
-                onClick={() => hover && seek(hover.index)}
+                onClick={() => {
+                  if (hoverStep != null) seek(hoverStep);
+                  else if (hovered) togglePin(hovered);
+                }}
               >
                 <ChartFrame
                   height={height}
                   margin={margin}
-                  label={`${m.label} remaining, as a share of the intact graph, against the share of cell types removed, for ${totalWord} removal strategies. Drawn up to ${percent(fraction)} removed. The table below the figure lists the summary values.`}
+                  label={`${m.label} remaining, as a share of the intact graph, against the share of cell types removed, for ${totalWord} removal strategies, drawn up to ${percent(fraction)} removed. The table after the figure lists the halving point and area under the curve for each.`}
                   onPointer={pointer}
-                  onLeave={() => setHover(null)}
-                  overlay={({ width, height: innerHeight, margin: frame }) => {
-                    if (!hover) return null;
-                    const inner = { width: width - frame.left - frame.right, height: innerHeight };
-                    const { x } = geometry(inner);
-                    const k = hover.index;
-                    const tipRows = series.map((s) => ({ ...s, v: s.values[k] })).sort((a, b) => a.v - b.v);
-                    return (
-                      <Tooltip
-                        x={frame.left + x(fractions[k])}
-                        y={narrow ? frame.top + 4 : frame.top + innerHeight / 2}
-                        width={width}
-                      >
-                        <strong>{percent(fractions[k])} removed</strong>
-                        {tipRows.map((s) => (
-                          <Row key={s.id} label={s.name} value={percent(s.v)} color={s.color} />
-                        ))}
-                        {random && (
-                          <span className="race-tip-note">
-                            {randomTrials} random orders: {percent(random.trials.low[k])} to {percent(random.trials.high[k])}
-                          </span>
-                        )}
-                      </Tooltip>
-                    );
+                  onLeave={() => {
+                    setHovered(null);
+                    setHoverStep(null);
                   }}
                 >
                   {(inner) => {
@@ -388,11 +361,14 @@ export default function Collapse({ meta, percolation, types, atlas }) {
                     const labels = narrow
                       ? []
                       : spreadLabels(
-                          standings.map((s) => ({ id: s.id, label: s.name, color: s.color, y: y(s.value) })),
-                          16,
+                          series.map((s) => ({ id: s.id, name: s.name, color: s.color, value: s.values[batch], y: y(s.values[batch]) })),
+                          17,
                           4,
                           inner.height,
                         );
+                    labelSpots.current = labels;
+                    const half = y(0.5);
+                    const room = inner.width + (narrow ? margin.right : 0);
                     return (
                       <>
                         <defs>
@@ -423,8 +399,8 @@ export default function Collapse({ meta, percolation, types, atlas }) {
                           format={(t) => `${Math.round(t * 100)}%`}
                           title="Cell types removed"
                         />
-                        <line className="race-half" x1={0} x2={inner.width} y1={y(0.5)} y2={y(0.5)} />
-                        <text className="race-half-label" x={inner.width - 4} y={y(0.5) - 7} textAnchor="end">
+                        <line className="race-half" x1={0} x2={inner.width} y1={half} y2={half} />
+                        <text className="race-half-label" x={inner.width - 4} y={half + 16} textAnchor="end">
                           Half of intact
                         </text>
 
@@ -434,36 +410,20 @@ export default function Collapse({ meta, percolation, types, atlas }) {
                             <path
                               key={s.id}
                               d={lines[i]}
-                              className={`race-line ${dim(s.id) ? "is-dim" : ""} ${focus === s.id ? "is-focus" : ""}`}
+                              className={`race-line ${dim(s.id) ? "is-dim" : ""} ${active === s.id ? "is-focus" : ""}`}
                               style={{ stroke: s.color, strokeDasharray: s.trials ? "5 4" : undefined }}
                             />
                           ))}
                         </g>
 
-                        {series.map((s) =>
-                          s.ci && fraction >= s.ci[0] ? (
-                            <line
-                              key={`ci-${s.id}`}
-                              className={`race-ci-bar ${dim(s.id) ? "is-dim" : ""}`}
-                              x1={x(s.ci[0])}
-                              x2={x(Math.min(s.ci[1], fraction))}
-                              y1={y(0.5)}
-                              y2={y(0.5)}
-                              style={{ stroke: s.color }}
-                            />
-                          ) : null,
-                        )}
-                        {standings.map((s) =>
-                          s.halved ? (
-                            <g
-                              key={`half-${metric}-${s.id}`}
-                              className={dim(s.id) ? "is-dim" : ""}
-                              transform={`translate(${x(s.halvedAt)},${y(0.5)})`}
-                            >
-                              <circle r={5} className="race-ring" style={{ stroke: s.color }} />
-                              <circle r={4.5} className="race-halving" style={{ stroke: s.color }} />
-                            </g>
-                          ) : null,
+                        {hoverStep != null && hoverStep !== batch && (
+                          <line
+                            className="race-hover-line"
+                            x1={x(fractions[hoverStep])}
+                            x2={x(fractions[hoverStep])}
+                            y1={0}
+                            y2={inner.height}
+                          />
                         )}
 
                         <line
@@ -475,45 +435,67 @@ export default function Collapse({ meta, percolation, types, atlas }) {
                           style={{ transform: `translateX(${head}px)` }}
                         />
 
-                        {hover && (
-                          <g>
-                            <line
-                              className="race-hover-line"
-                              x1={x(fractions[hover.index])}
-                              x2={x(fractions[hover.index])}
-                              y1={0}
-                              y2={inner.height}
+                        {series.map((s) =>
+                          halved(s) ? (
+                            <circle
+                              key={`half-${metric}-${s.id}`}
+                              className={`race-halving ${dim(s.id) ? "is-dim" : ""}`}
+                              cx={x(s.halvedAt)}
+                              cy={half}
+                              r={active === s.id ? 5 : 4}
                             />
-                            {series.map((s) => (
-                              <circle
-                                key={s.id}
-                                cx={x(fractions[hover.index])}
-                                cy={y(s.values[hover.index])}
-                                r={3.5}
-                                className="race-dot"
-                                style={{ fill: s.color }}
-                              />
-                            ))}
-                          </g>
+                          ) : null,
                         )}
+
+                        {(() => {
+                          let lastRight = -Infinity;
+                          return series
+                            .filter((s) => annotated.includes(s.id) && halved(s))
+                            .sort((a, b) => a.halvedAt - b.halvedAt)
+                            .map((s) => {
+                              const name = narrow ? "" : `${s.name}, `;
+                              const value = `${narrow ? "Halved" : "halved"} at ${percent(s.halvedAt)}`;
+                              // Approximate width of 12px Archivo; on wide charts the note waits until the playhead labels have passed it.
+                              const w = (name.length + value.length) * 6.4;
+                              const left = Math.max(0, Math.min(room - w, x(s.halvedAt) - w / 2));
+                              if (!narrow && head < left + w + 12) return null;
+                              const below = left < lastRight + 8;
+                              lastRight = below ? lastRight : left + w;
+                              return (
+                                <text
+                                  key={`note-${metric}-${s.id}`}
+                                  className="race-note"
+                                  x={left}
+                                  y={below ? half + 20 : half - 11}
+                                >
+                                  {name && <tspan style={{ fill: s.color }}>{name}</tspan>}
+                                  {value}
+                                </text>
+                              );
+                            });
+                        })()}
 
                         {series.map((s) => (
                           <circle
                             key={`head-${s.id}`}
-                            r={4}
+                            r={active === s.id ? 4.5 : 3.5}
                             className={`race-dot race-move ${dim(s.id) ? "is-dim" : ""}`}
                             style={{ fill: s.color, transform: `translate(${head}px, ${y(s.values[batch])}px)` }}
                           />
                         ))}
                         {labels.map((l) => (
-                          <text
+                          <g
                             key={`label-${l.id}`}
-                            className={`direct-label race-move ${dim(l.id) ? "is-dim" : ""} ${focus === l.id ? "is-focus" : ""}`}
-                            dy="0.32em"
-                            style={{ fill: l.color, transform: `translate(${head + 10}px, ${l.y}px)` }}
+                            className={`race-label race-move ${dim(l.id) ? "is-dim" : ""} ${active === l.id ? "is-focus" : ""}`}
+                            style={{ transform: `translate(${head}px, ${l.y}px)` }}
                           >
-                            {l.label}
-                          </text>
+                            <text className="race-label-value" x={LABEL_VALUE_X} dy="0.32em" textAnchor="end">
+                              {percent(l.value)}
+                            </text>
+                            <text className="race-label-name" x={LABEL_NAME_X} dy="0.32em" style={{ fill: l.color }}>
+                              {l.name}
+                            </text>
+                          </g>
                         ))}
                       </>
                     );
@@ -522,105 +504,93 @@ export default function Collapse({ meta, percolation, types, atlas }) {
               </div>
 
               {narrow && (
-                <div className="legend race-legend" aria-hidden="true">
+                <ul className="race-key" aria-label={`${m.label} remaining at ${percent(fraction)} removed`}>
                   {series.map((s) => (
-                    <span key={s.id}>
-                      <span className="swatch is-line" style={{ background: s.color }} />
-                      {s.name}
-                    </span>
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        aria-pressed={pinned === s.id}
+                        className={dim(s.id) ? "is-dim" : ""}
+                        onClick={() => togglePin(s.id)}
+                      >
+                        <span className="swatch is-line" style={{ background: s.color }} aria-hidden="true" />
+                        <span className="race-key-name">{s.name}</span>
+                        <span className={`race-key-value ${halved(s) ? "is-halved" : ""}`}>{percent(s.values[batch])}</span>
+                      </button>
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
 
-              <div className="race-scrub">
-                <Slider
-                  label="Removal step"
-                  min={0}
-                  max={last}
-                  value={batch}
-                  onChange={seek}
-                  format={(v) => `${percent(fractions[v])} removed`}
-                  valueText={(v) => `Step ${v} of ${last}, ${percent(fractions[v])} of cell types removed`}
-                />
-              </div>
-
-              <p className="caption race-chart-caption">
-                Each line is the share of the intact value still standing as cell types are removed; the vertical line is
-                the current step. Rings on the half line mark where each attack
-                halves the measure. The gray band spans the lowest and highest value across {randomTrials} random removal
-                orders, the dashed line is one of them, and the short bar on the half line is the 95% confidence interval
-                of the random halving point. Click the chart or drag the slider to move to any step.
-              </p>
-            </div>
-
-            <div className="race-side">
-              <p className="label">
-                {m.label} remaining at {percent(fraction)} removed, most damaged first
-              </p>
-              <ol className="board race-board" style={{ height: total * ROW }} aria-label={`${m.label} remaining, most damaged first`}>
-                {standings.map((s) => (
-                  <li
-                    key={s.id}
-                    ref={(node) => {
-                      if (node) rows.current.set(s.id, node);
-                      else rows.current.delete(s.id);
+              <div className={`race-scrub ${narrow ? "is-narrow" : ""}`}>
+                <button
+                  type="button"
+                  className="race-play"
+                  onClick={toggle}
+                  aria-label={`${playLabel} the removal race`}
+                  title={playLabel}
+                >
+                  <Icon kind={playing ? "pause" : atEnd ? "replay" : "play"} />
+                </button>
+                <div className="race-track" style={{ "--at": fraction / fractions[last] }}>
+                  <span className="race-rail" aria-hidden="true" />
+                  <input
+                    type="range"
+                    min={0}
+                    max={fractions[last]}
+                    step="any"
+                    value={fraction}
+                    aria-label="Cell types removed"
+                    aria-valuetext={`Step ${batch} of ${last}, ${percent(fraction)} of cell types removed`}
+                    onChange={(event) => seek(nearestStep(fractions, Number(event.target.value)))}
+                    onKeyDown={(event) => {
+                      const move = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1, PageUp: 5, PageDown: -5 }[
+                        event.key
+                      ];
+                      if (move) seek(batch + move);
+                      else if (event.key === "Home") seek(0);
+                      else if (event.key === "End") seek(last);
+                      else return;
+                      event.preventDefault();
                     }}
-                    className={`${dim(s.id) ? "is-dim" : ""} ${focus === s.id ? "is-focus" : ""}`}
-                  >
-                    <span className="bar" style={{ background: s.color }} />
-                    <span className="race-board-name">
-                      <span className="race-board-label">{s.name}</span>
-                      <span className="race-meter" aria-hidden="true">
-                        <span style={{ transform: `scaleX(${Math.max(0, s.value)})`, background: s.color }} />
-                      </span>
-                      <span className={`meta ${s.halved ? "is-halved" : ""}`} key={s.halved ? "halved" : "intact"}>
-                        {s.halved ? `halved at ${percent(s.halvedAt)}` : `AUC ${fixed(s.auc, 3)}`}
-                      </span>
-                    </span>
-                    <span className="value">{percent(s.value)}</span>
-                  </li>
-                ))}
-              </ol>
-              <p className="caption race-commentary">
-                {halvedSentence(halvedCount, total, m.noun)}
-                {batch > 0 && randomNow && leader.id !== randomNow.id
-                  ? ` Ranked by ${leader.label}, ${percent(leader.value)} is left; random removal leaves ${percent(randomNow.value)}.`
-                  : ""}
-              </p>
+                  />
+                </div>
+                {readout}
+              </div>
               <div className="visually-hidden" role="status" aria-live="polite">
                 {announcement}
               </div>
             </div>
-          </div>
 
-          <div className="race-multiples-head">
-            <p className="label">
-              Where each attack strikes at step {batch}, {percent(fraction)} removed
-            </p>
-            <div className="legend race-map-legend" aria-hidden="true">
-              <span>
-                <span className="race-key race-key-live" />
-                Present
-              </span>
-              <span>
-                <span className="race-key race-key-fresh" />
-                Removed in this step
-              </span>
-              <span>
-                <span className="race-key race-key-silent" />
-                Cut off from sensory input
-              </span>
+            <div className="race-maps-head">
+              <div className="legend race-map-legend" aria-hidden="true">
+                <span>
+                  <span className="race-swatch race-swatch-live" />
+                  Present
+                </span>
+                <span>
+                  <span className="race-swatch race-swatch-fresh" />
+                  Removed in this step
+                </span>
+                <span>
+                  <span className="race-swatch race-swatch-silent" />
+                  Cut off from sensory input
+                </span>
+              </div>
             </div>
+            <Multiples
+              strategies={strategies}
+              types={types}
+              atlas={atlas}
+              batch={batch}
+              aspect={aspect}
+              active={active}
+              pinned={pinned}
+              onHover={setHovered}
+              onPin={togglePin}
+              silentColor={mapTokens["field-ink-2"]}
+            />
           </div>
-          <Multiples
-            strategies={strategies}
-            types={types}
-            atlas={atlas}
-            batch={batch}
-            aspect={aspect}
-            focus={focus}
-            silentColor={mapTokens["field-ink-2"]}
-          />
         </Figure>
 
         <Summary model={model} />
@@ -632,9 +602,9 @@ export default function Collapse({ meta, percolation, types, atlas }) {
 const MAP_STAGGER_MS = 18;
 
 /** One strategy per map; redraws are staggered so six canvases never repaint in the same frame. */
-const Multiples = memo(function Multiples({ strategies, types, atlas, batch, aspect, focus, silentColor }) {
+const Multiples = memo(function Multiples({ strategies, types, atlas, batch, aspect, active, pinned, onHover, onPin, silentColor }) {
   return (
-    <div className="multiples race-multiples">
+    <ul className="race-maps">
       {strategies.map(({ id, label }, index) => (
         <MapCell
           key={id}
@@ -645,15 +615,19 @@ const Multiples = memo(function Multiples({ strategies, types, atlas, batch, asp
           batch={batch}
           delay={index * MAP_STAGGER_MS}
           aspect={aspect}
-          dimmed={focus !== "all" && focus !== id}
+          dimmed={active != null && active !== id}
+          focused={active === id}
+          pinned={pinned === id}
+          onHover={onHover}
+          onPin={onPin}
           silentColor={silentColor}
         />
       ))}
-    </div>
+    </ul>
   );
 });
 
-const MapCell = memo(function MapCell({ id, label, types, atlas, batch, delay, aspect, dimmed, silentColor }) {
+const MapCell = memo(function MapCell({ id, label, types, atlas, batch, delay, aspect, dimmed, focused, pinned, onHover, onPin, silentColor }) {
   const [shown, setShown] = useState(batch);
   useEffect(() => {
     if (shown === batch) return undefined;
@@ -665,14 +639,24 @@ const MapCell = memo(function MapCell({ id, label, types, atlas, batch, delay, a
   const removed = replay.removed_types[shown];
   const silenced = replay.silenced_types[shown];
   return (
-    <div className={`multiple ${dimmed ? "is-dim" : ""}`}>
-      <p className="label">
-        <span className="race-multiple-name">
-          <span className="swatch" style={{ background: `var(--glow-${id})` }} />
-          {sentence(label)}
-        </span>
-      </p>
-      <div className="canvas-box" style={{ aspectRatio: aspect }}>
+    <li
+      className={`race-map ${dimmed ? "is-dim" : ""} ${focused ? "is-focus" : ""}`}
+      style={{ "--strategy": `var(--glow-${id})` }}
+      onPointerEnter={(event) => event.pointerType === "mouse" && onHover(id)}
+      onPointerLeave={(event) => event.pointerType === "mouse" && onHover(null)}
+      onClick={() => onPin(id)}
+    >
+      <button
+        type="button"
+        className="race-map-name"
+        aria-pressed={pinned}
+        onFocus={(event) => event.target.matches(":focus-visible") && onHover(id)}
+        onBlur={() => onHover(null)}
+      >
+        <span className="swatch" aria-hidden="true" />
+        {sentence(label)}
+      </button>
+      <div className="race-map-canvas" style={{ aspectRatio: aspect }}>
         <Atlas
           types={types}
           atlas={atlas}
@@ -687,25 +671,34 @@ const MapCell = memo(function MapCell({ id, label, types, atlas, batch, delay, a
           label={`Nervous system under ${label} removal at ${percent(replay.fraction_removed[shown])} removed: ${count(removed)} cell types removed, ${count(silenced)} cut off from sensory input.`}
         />
       </div>
-      <div className="race-counts">
-        <span>
-          <span className="number">{count(removed)}</span> removed
-        </span>
-        <span>
-          <span className="number">{count(silenced)}</span> cut off
-        </span>
-      </div>
-    </div>
+      <p className="race-map-count" aria-hidden="true">
+        <span className="number">{count(silenced)}</span> cut off
+      </p>
+    </li>
   );
 });
 
-/** Section heading and the prose that introduces the race, with notes on the random baseline. */
+/** Section heading and the prose that introduces the race, with notes on the random baseline and how to read it. */
 const Intro = memo(function Intro({ meta, percolation, flowSeries, pairsSeries }) {
   const totalWord = numberWord(meta.strategies.length);
   const fastest = flowSeries.filter((s) => !s.trials).sort((a, b) => a.halvedAt - b.halvedAt)[0];
   const randomFlow = flowSeries.find((s) => s.trials);
   const randomPairs = pairsSeries.find((s) => s.id === randomFlow.id);
   const randomTrials = percolation.strategies[randomFlow.id].trials;
+  const batchShare = meta.protocol?.batch_fraction_of_remaining;
+  const avalanche = useMemo(() => {
+    const fractions = percolation.strategies[meta.strategies[0].id].fraction_removed;
+    let best = null;
+    for (const { id, label } of meta.strategies) {
+      const sizes = percolation.strategies[id].avalanche;
+      if (!Array.isArray(sizes)) continue;
+      sizes.forEach((size, i) => {
+        if (size != null && (!best || size > best.size)) best = { size, label, fraction: fractions[i] };
+      });
+    }
+    return best;
+  }, [percolation, meta.strategies]);
+
   return (
     <div className="section-head">
       <h2 id="collapse-title">{sentence(totalWord)} ways to take it apart</h2>
@@ -716,6 +709,14 @@ const Intro = memo(function Intro({ meta, percolation, flowSeries, pairsSeries }
               Random removal is run {randomTrials} times in different orders. Flow capacity halves at{" "}
               {percent(randomFlow.halvedAt)} on average
               {randomFlow.ci ? ` (95% CI ${percent(randomFlow.ci[0])} to ${percent(randomFlow.ci[1])})` : ""}.
+            </Sidenote>
+            <Sidenote title="Reading the race">
+              {batchShare ? `Each step removes ${percent(batchShare, 0)} of the cell types still present. ` : ""}
+              The gray band spans the lowest and highest values over the {randomTrials} random orders, and the dashed
+              line is one of those runs. Gray squares on the maps are types cut off from every sensory type.
+              {avalanche && avalanche.size > 1000
+                ? ` The largest single step, under ${avalanche.label} at ${percent(avalanche.fraction)} removed, cuts ${count(avalanche.size)} types off at once.`
+                : ""}
             </Sidenote>
             <Sidenote title="Area under the curve">
               Random removal scores {fixed(randomFlow.auc, 3)} on flow capacity and {fixed(randomPairs.auc, 3)} on
@@ -738,7 +739,7 @@ const Intro = memo(function Intro({ meta, percolation, flowSeries, pairsSeries }
   );
 });
 
-/** Summary table of AUC and halving point per strategy, ordered by halving point. */
+/** Summary table of AUC and halving points per strategy, ordered by the flow halving point. */
 const Summary = memo(function Summary({ model }) {
   const flowSeries = model.flow;
   return (
@@ -757,6 +758,9 @@ const Summary = memo(function Summary({ model }) {
               </th>
               <th scope="col" className="num">
                 Flow capacity halves at
+              </th>
+              <th scope="col" className="num">
+                Reachable pairs halve at
               </th>
             </tr>
           </thead>
@@ -782,6 +786,7 @@ const Summary = memo(function Summary({ model }) {
                         </span>
                       )}
                     </td>
+                    <td className="num">{pairs.halvedAt != null ? percent(pairs.halvedAt) : "Not within the range"}</td>
                   </tr>
                 );
               })}
