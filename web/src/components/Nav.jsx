@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { repoUrl } from "../lib/data.js";
 import { useReducedMotion } from "../lib/hooks.js";
+import { useTheme } from "../lib/theme.js";
 
 const LINKS = [
   ["measure", "The measure"],
@@ -10,9 +11,34 @@ const LINKS = [
   ["methods", "Methods"],
 ];
 
+function ThemeMark({ dark }) {
+  return dark ? (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="M13.2 10.1A5.6 5.6 0 0 1 5.9 2.8a5.6 5.6 0 1 0 7.3 7.3Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ) : (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M8 1.1v1.6M8 13.3v1.6M1.1 8h1.6M13.3 8h1.6M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 /** Site bar; `ready` tells it the sections have rendered so it can mark the one being read. */
 export default function Nav({ ready = true }) {
   const [current, setCurrent] = useState(null);
+  const [theme, toggleTheme] = useTheme();
   const strip = useRef(null);
   const reduced = useReducedMotion();
 
@@ -82,6 +108,14 @@ export default function Nav({ ready = true }) {
             Code and data
           </a>
         </nav>
+        <button
+          type="button"
+          className="nav-theme"
+          onClick={toggleTheme}
+          aria-label={theme === "dark" ? "Switch to the light theme" : "Switch to the dark theme"}
+        >
+          <ThemeMark dark={theme === "dark"} />
+        </button>
       </div>
     </header>
   );

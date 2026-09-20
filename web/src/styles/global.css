@@ -77,6 +77,36 @@
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/*
+ * Dark reading surface. Only the paper side moves: the field is the imaging black in either theme, and the
+ * strategy hues keep their identity, with the text-weight -ink variants lightened to clear 4.5:1 on dark paper.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0b0f10;
+  --paper-raised: #13191a;
+  --wash: #1a2122;
+  --rule: #272f31;
+  --rule-strong: #565f62;
+  --ink: #e9eef0;
+  --ink-2: #a5afb2;
+  --ink-3: #8c9699;
+  --control-border: #798386;
+
+  --signal: #ff5f73;
+
+  --s-sm_betweenness-ink: #7cb4ff;
+  --s-betweenness-ink: #ff9a63;
+  --s-pagerank-ink: #3fd9a0;
+  --s-out_strength-ink: #f0bb3d;
+  --s-in_strength-ink: #ff9ec6;
+  --s-random-ink: #9aa4a8;
+
+  --muted: #8c9699;
+  --tissue: #1f2729;
+  --tissue-edge: #333d3f;
+}
+
 *,
 *::before,
 *::after {
@@ -835,6 +865,25 @@ input[type="search"]::placeholder {
   margin-left: auto;
 }
 
+.nav-theme {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  min-height: 2.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--field-ink-2);
+  cursor: pointer;
+  transition: color 120ms;
+}
+
+.nav-theme:hover {
+  color: var(--field-ink);
+}
+
 .nav :focus-visible {
   outline-color: var(--field-ink);
   outline-offset: -2px;
@@ -1492,4 +1541,19 @@ pre.cmd {
     animation-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Theme change: the new theme is wiped over the old one, which stays put underneath. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 2;
 }

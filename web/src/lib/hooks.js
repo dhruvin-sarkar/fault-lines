@@ -6,14 +6,21 @@ function readTokens(key) {
   return Object.fromEntries(key.split(",").map((n) => [n, style.getPropertyValue(`--${n}`).trim()]));
 }
 
-/** Resolved values of CSS custom properties, for canvas code. The palette is fixed, so they are read once. */
+/** Resolved values of CSS custom properties, for canvas code, re-read whenever the theme changes. */
 export function useTokens(names) {
   const key = names.join(",");
   const [tokens, setTokens] = useState(() => readTokens(key));
-  // Re-read once after mount in case a stylesheet arrived after the first render.
   useEffect(() => {
-    const next = readTokens(key);
-    setTokens((prev) => (Object.keys(next).every((n) => prev[n] === next[n]) ? prev : next));
+    const reread = () =>
+      setTokens((prev) => {
+        const next = readTokens(key);
+        return Object.keys(next).every((n) => prev[n] === next[n]) ? prev : next;
+      });
+    // Once on mount in case a stylesheet arrived after the first render, then on every theme change.
+    reread();
+    const watcher = new MutationObserver(reread);
+    watcher.observe(document.documentElement, { attributeFilter: ["data-theme"] });
+    return () => watcher.disconnect();
   }, [key]);
   return tokens;
 }
